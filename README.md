@@ -6,7 +6,7 @@ Radon is a programming language that gets compiled to Minecraft: Java Edition's 
 
 Install the repository by clicking `Code` then `Download ZIP` and then extract it. Alternatively you can use `git clone https://github.com/OguzhanUmutlu/radon` command to install it.
 
-Once it's installed you can run the `main.py` command with the path of your file. Example: `python3 main.py /usr/code.radon`
+Once it's installed you can run the `main.py` python file with the path of your file. Example: `python3 main.py /usr/code.radon`
 
 This should create a datapack with a folder name of `build/` in the directory of your radon file.
 
