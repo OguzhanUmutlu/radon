@@ -1,7 +1,19 @@
+from ast import If
+from enum import Enum
 from typing import List
-from tokenizer import Token, TokenType, Tokenizer, SET_OP, INC_OP, is_float
-from error import raise_syntax_error
-from utils import UniversalStrMixin
+
+from tokenizer import (
+    GroupToken,
+    Token,
+    TokenType,
+    SET_OP,
+    INC_OP,
+    is_float,
+    split_tokens,
+    tokenize,
+)
+from error import raise_syntax_error, show_err
+from utils import FunctionArgument, UniversalStrMixin
 
 ENDERS = {
     TokenType.EOL,
@@ -170,7 +182,7 @@ def is_time(token: Token):
     )
 
 
-class StatementType:
+class StatementType(Enum):
     INLINE = "inline"
     SET_VARIABLE = "set_variable"
     DEFINE_FUNCTION = "define_function"
@@ -184,487 +196,661 @@ class StatementType:
     WHILE = "while"
     LOOP = "loop"
     SCHEDULE = "schedule"
+    IMPORT = "import"
 
 
 class Statement(UniversalStrMixin):
-    def __init__(self, type: StatementType):
+    def __init__(self, type: StatementType, start: int, end: int):
         self.type = type
+        self.start = start
+        self.end = end
 
 
-class AST:
-    def read_until_curly(tokens: List[Token], start_index: int):
-        length = len(tokens)
-        index = start_index
-        while index < length:
-            if (
-                tokens[index].type == TokenType.GROUP
-                and tokens[index].open.value == "{"
-            ):
-                return index
-            index += 1
-        return None
+class ImportStatement(Statement):
+    def __init__(self, start: int, end: int, path: Token, _as: Token | None = None):
+        super().__init__(StatementType.IMPORT, start, end)
+        self.path = path
+        self._as = _as
 
-    def read_expression(tokens: List[Token], start_index: int):
-        length = len(tokens)
-        index = start_index
-        operator_count = 0
-        result = []
 
-        while index < length:
-            operator_count += 1
-            token = tokens[index]
+class ScheduleStatement(Statement):
+    def __init__(self, start: int, end: int, time: Token, body: List[Statement]):
+        super().__init__(StatementType.SCHEDULE, start, end)
+        self.time = time
+        self.body = body
 
-            if token.type in {TokenType.EOF, TokenType.EOE}:
-                break
-            elif token.type == TokenType.EOL:
-                if operator_count % 2 == 0 and (
-                    index == 0 or tokens[index - 1].value != "\\"
-                ):
-                    break
 
-            result.append(token)
-            index += 1
-
-        return index, result
-
-    def make_expr(tokens: List[Token]):
-        if len(tokens) == 0:
-            return []
-        if len(tokens) == 2 and tokens[1].value in INC_OP:
-            return tokens
-        t0 = tokens[0]
-        if t0.value in COMMANDS:
-            return tokens
-        t1 = tokens[1] if len(tokens) > 1 else None
-        if (
-            (
-                t0.type == TokenType.IDENTIFIER
-                or t0.type == TokenType.SELECTOR_IDENTIFIER
-            )
-            and t1 != None
-            and t1.type == TokenType.OPERATOR
-            and t1.value in SET_OP
-        ):
-            (_, expr) = AST.read_expression(tokens, 2)
-            if len(expr) == 0:
-                raise_syntax_error("Expected an expression for the set operation", t1)
-            return [t1, t0, expr]  # [=, var_name, [...expression]]
-        stack = []
-        output = []
-        for index, token in enumerate(tokens):
-            if index % 2 == 0:
-                if token.type not in EXPR_EXPR:
-                    raise_syntax_error(
-                        "Expected a non-operator non-symbol token", token
-                    )
-                output.append(token)
-                continue
-            if token.type != TokenType.OPERATOR or token.value not in EXPR_OP:
-                raise_syntax_error("Expected an operator", token)
-            o1 = token
-            o2 = None
-            while True:
-                o2 = stack[-1] if len(stack) > 0 else None
-                if o2 == None or (
-                    operators[o2.value]["p"] <= operators[o1.value]["p"]
-                    and (
-                        operators[o2.value]["p"] != operators[o1.value]["p"]
-                        or operators[o1.value]["a"] != "left"
-                    )
-                ):
-                    break
-                output.append(stack.pop())
-            stack.append(o1)
-
-        while len(stack) > 0:
-            output.append(stack.pop())
-
-        return output
-
-    def next_token(tokens: List[Token], index: List[int]):
-        index[0] += 1
-        if index[0] >= len(tokens):
-            return None
-        return tokens[index[0]]
-
-    def parse_str(code: str):
-        (tokens, macros) = Tokenizer.tokenize(code)
-        return (AST.parse(tokens, macros), macros)
-
-    def parse_iterate(
-        statements: List[Statement], tokens: List[Token], index: List[int], macros: List
+class IfFlowStatement(Statement):
+    def __init__(
+        self,
+        start: int,
+        end: int,
+        condition: List[Token],
+        body: List[Statement],
+        elseBody: List[Statement] | None,
     ):
-        t0 = AST.next_token(tokens, index)
-        if t0 == None:
-            return False
-        if t0.type == TokenType.EOF:
-            return False
-        if t0.type == TokenType.EOL or t0.type == TokenType.EOE:
-            return True
-        if (
-            t0.value == "schedule"
-            and index[0] + 1 < len(tokens)
-            and is_time(tokens[index[0] + 1])
+        super().__init__(StatementType.IF_FLOW, start, end)
+        self.condition = condition
+        self.body = body
+        self.elseBody = elseBody
+
+
+class LoopStatement(Statement):
+    def __init__(self, start: int, end: int, time: Token | None, body: List[Statement]):
+        super().__init__(StatementType.LOOP, start, end)
+        self.time = time
+        self.body = body
+
+
+class IntroduceVariableStatement(Statement):
+    def __init__(self, start: int, end: int, name: Token, varType: Token):
+        super().__init__(StatementType.INTRODUCE_VARIABLE, start, end)
+        self.name = name
+        self.varType = varType
+
+
+class DefineFunctionStatement(Statement):
+    def __init__(
+        self,
+        start: int,
+        end: int,
+        name: Token,
+        body: List[Statement],
+        arguments: List[FunctionArgument],
+        returns: Token,
+    ):
+        super().__init__(StatementType.DEFINE_FUNCTION, start, end)
+        self.name = name
+        self.body = body
+        self.arguments = arguments
+        self.returns = returns
+
+
+class ReturnStatement(Statement):
+    def __init__(self, start: int, end: int, keyword: Token, expr: List[Token]):
+        super().__init__(StatementType.RETURN, start, end)
+        self.keyword = keyword
+        self.expr = expr
+
+
+class BreakStatement(Statement):
+    def __init__(self, start: int, end: int, keyword: Token):
+        super().__init__(StatementType.BREAK, start, end)
+        self.keyword = keyword
+
+
+class ContinueStatement(Statement):
+    def __init__(self, start: int, end: int, keyword: Token):
+        super().__init__(StatementType.CONTINUE, start, end)
+        self.keyword = keyword
+
+
+class InlineStatement(Statement):
+    def __init__(self, start: int, end: int, expr: List[Token]):
+        super().__init__(StatementType.INLINE, start, end)
+        self.expr = expr
+
+
+class ExecuteMacroStatement(Statement):
+    def __init__(self, start: int, end: int, command: str, body: List[Statement]):
+        super().__init__(StatementType.EXECUTE_MACRO, start, end)
+        self.command = command
+        self.body = body
+
+
+def read_until_curly(tokens: List[Token], start_index: int):
+    length = len(tokens)
+    index = start_index
+    while index < length:
+        t = tokens[index]
+        if isinstance(t, GroupToken) and t.open.value == "{":
+            return index
+        index += 1
+    return None
+
+
+def read_expression(tokens: List[Token], start_index: int):
+    length = len(tokens)
+    index = start_index
+    operator_count = 0
+    result = []
+
+    while index < length:
+        operator_count += 1
+        token = tokens[index]
+
+        if token.type in {TokenType.EOF, TokenType.EOE}:
+            break
+        elif token.type == TokenType.EOL:
+            if operator_count % 2 == 0 and (
+                index == 0 or tokens[index - 1].value != "\\"
+            ):
+                break
+
+        result.append(token)
+        index += 1
+
+    return index, result
+
+
+def make_expr(tokens: List[Token]):
+    if len(tokens) == 0:
+        return []
+    if len(tokens) == 2 and tokens[1].value in INC_OP:
+        return tokens
+    t0 = tokens[0]
+    if t0.value in COMMANDS:
+        return tokens
+    t1 = tokens[1] if len(tokens) > 1 else None
+    if (
+        (t0.type == TokenType.IDENTIFIER or t0.type == TokenType.SELECTOR_IDENTIFIER)
+        and t1 != None
+        and t1.type == TokenType.OPERATOR
+        and t1.value in SET_OP
+    ):
+        (_, expr) = read_expression(tokens, 2)
+        if len(expr) == 0:
+            raise_syntax_error("Expected an expression for the set operation", t1)
+        return [t1, t0] + expr  # [=, var_name, ...expression]
+    stack = []
+    output = []
+    for index, token in enumerate(tokens):
+        if index % 2 == 0:
+            if token.type not in EXPR_EXPR:
+                raise_syntax_error("Expected a non-operator non-symbol token", token)
+            output.append(token)
+            continue
+        if token.type != TokenType.OPERATOR or token.value not in EXPR_OP:
+            raise_syntax_error("Expected an operator", token)
+        o1 = token
+        o2 = None
+        while True:
+            o2 = stack[-1] if len(stack) > 0 else None
+            if o2 == None or (
+                operators[o2.value]["p"] <= operators[o1.value]["p"]
+                and (
+                    operators[o2.value]["p"] != operators[o1.value]["p"]
+                    or operators[o1.value]["a"] != "left"
+                )
+            ):
+                break
+            output.append(stack.pop())
+        stack.append(o1)
+
+    while len(stack) > 0:
+        output.append(stack.pop())
+
+    return output
+
+
+def next_token(tokens: List[Token], index: List[int]):
+    index[0] += 1
+    if index[0] >= len(tokens):
+        return None
+    return tokens[index[0]]
+
+
+def parse_str(code: str):
+    (tokens, macros) = tokenize(code)
+    return (parse(tokens, macros), macros)
+
+
+def parse_iterate(
+    statements: List[Statement], tokens: List[Token], index: List[int], macros: List
+):
+    t0 = next_token(tokens, index)
+    if t0 == None:
+        return False
+    if t0.type == TokenType.EOF:
+        return False
+    if t0.type == TokenType.EOL or t0.type == TokenType.EOE:
+        return True
+    if t0.value == "import":
+        t1 = next_token(tokens, index)
+        if t1 == None or (
+            t1.type != TokenType.IDENTIFIER and t1.type != TokenType.STRING_LITERAL
         ):
-            # schedule 1t { <body> }
-            t1 = AST.next_token(tokens, index)
-            body = AST.next_token(tokens, index)
-            if body == None:
-                raise_syntax_error("Expected an expression", t0)
-            if body.type != TokenType.GROUP or body.open.value != "{":
-                raise_syntax_error("Expected an expression inside the braces", body)
+            raise_syntax_error("Expected an identifier or a path", t0)
+            return False
 
-            statement = Statement(StatementType.SCHEDULE)
-            statement.time = t1
-            statement.body = AST.parse(body.children, macros)
-            statement.token = Token(t0.code, TokenType.POINTER, t0.start, body.end)
+        _as = None
 
-            statements.append(statement)
-            return True
-        if t0.value == "for":
-            # for <time> (<init>; <condition>; <iterator>) { <body> }
-            # for (<init>; <condition>; <iterator>) { <body> }
-            t1 = AST.next_token(tokens, index)
-            if t1 == None:
-                raise_syntax_error("Expected an expression", t0)
-            tim = None
-            if is_time(t1):
-                tim = t1
-                t1 = AST.next_token(tokens, index)
-            if t1.type != TokenType.GROUP or t1.open.value != "(":
-                raise_syntax_error(
-                    "Expected an initializer, condition, and iterator inside the parentheses",
-                    t1 or t0,
-                )
-            spl = Tokenizer.split_tokens(t1.children, ";")
-            body = AST.next_token(tokens, index)
-            if body.type != TokenType.GROUP or body.open.value != "{":
-                raise_syntax_error(
-                    "Expected an expression inside the parentheses", body
-                )
-            init = AST.parse(spl[0], macros)
-            if len(init) != 1:
-                raise_syntax_error("Expected an expression in the initializer", t0)
-            init = init[0]
+        if t1.type == TokenType.STRING_LITERAL and t1.value[:-1].endswith(
+            ".mcfunction"
+        ):
+            t2 = next_token(tokens, index)
+            if t2 == None or t2.value != "as":
+                raise_syntax_error("Expected an 'as' keyword", t1)
 
-            iter = AST.parse(spl[2], macros)
-            if len(iter) != 1:
-                raise_syntax_error("Expected an expression in the iterator", t0)
-            iter = iter[0]
+            t3 = next_token(tokens, index)
+            if t3 == None or t3.type != TokenType.IDENTIFIER:
+                raise_syntax_error("Expected an identifier", t2)
 
-            statements.append(init)
+            _as = t3
 
-            ifSt = Statement(StatementType.IF_FLOW)
-            ifSt.condition = spl[1]
+        statement = ImportStatement(
+            start=t0.start, end=(_as or t1).end, path=t1, _as=_as
+        )
+        statements.append(statement)
+        return True
+    if (
+        t0.value == "schedule"
+        and index[0] + 1 < len(tokens)
+        and is_time(tokens[index[0] + 1])
+    ):
+        # schedule 1t { <body> }
+        t1 = next_token(tokens, index)
+        if t1 == None or not is_time(t1):
+            raise_syntax_error("Expected a time", t0)
+            return False
+        body = next_token(tokens, index)
+        if body == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        if not isinstance(body, GroupToken) or body.open.value != "{":
+            raise_syntax_error("Expected an expression inside the braces", body)
+
+        statement = ScheduleStatement(start=t0.start, end=body.end, time=t1, body=[])
+
+        statements.append(statement)
+        return True
+    if t0.value == "for":
+        # for <time> (<init>; <condition>; <iterator>) { <body> }
+        # for (<init>; <condition>; <iterator>) { <body> }
+        t1 = next_token(tokens, index)
+        if t1 == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        tim = None
+        if is_time(t1):
+            tim = t1
+            t1 = next_token(tokens, index)
+        if not isinstance(t1, GroupToken) or t1.open.value != "(":
+            raise_syntax_error(
+                "Expected an initializer, condition, and iterator inside the parentheses",
+                t1 or t0,
+            )
+            return False
+        spl = split_tokens(t1.children, ";")
+        body = next_token(tokens, index)
+        if not isinstance(body, GroupToken) or body.open.value != "{":
+            raise_syntax_error("Expected an expression inside the parentheses", body)
+            return False
+        init = parse(spl[0], macros)
+        if len(init) != 1:
+            raise_syntax_error("Expected an expression in the initializer", t0)
+        init = init[0]
+
+        iter = parse(spl[2], macros)
+        if len(iter) != 1:
+            raise_syntax_error("Expected an expression in the iterator", t0)
+        iter = iter[0]
+
+        statements.append(init)
+
+        ifSt = IfFlowStatement(
+            start=t1.start,
+            end=t1.end,
+            condition=spl[1],
+            body=[],
+            elseBody=parse_str("break")[0],
+        )
+
+        loopSt = LoopStatement(
+            start=t0.start,
+            end=body.end,
+            time=tim,
+            body=[ifSt] + parse(body.children, macros) + [iter],
+        )
+
+        statements.append(loopSt)
+        return True
+    if t0.value == "do":
+        # do { <body> } while <time> (<condition>)
+        # do { <body> } until <time> (<condition>)
+        # do { <body> } while(<condition>)
+        # do { <body> } until(<condition>)
+        body = next_token(tokens, index)
+        if body == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        if not isinstance(body, GroupToken) or body.open.value != "{":
+            raise_syntax_error("Expected an expression inside the braces", body)
+            return False
+        tW = next_token(tokens, index)
+        if tW == None or (tW.value != "while" and tW.value != "until"):
+            raise_syntax_error("Expected 'while' or 'until'", tW)
+            return False
+        tim = None
+        condition = next_token(tokens, index)
+        if condition == None:
+            raise_syntax_error("Expected an expression", tW)
+            return False
+        if is_time(condition):
+            tim = condition
+            condition = next_token(tokens, index)
+        if not isinstance(condition, GroupToken) or condition.open.value != "(":
+            raise_syntax_error(
+                "Expected an expression inside the parentheses", condition
+            )
+            return False
+
+        ifSt = IfFlowStatement(
+            start=condition.start,
+            end=condition.end,
+            condition=condition.children,
+            body=[],
+            elseBody=None,
+        )
+
+        if tW.value == "while":
             ifSt.body = []
-            ifSt.elseBody = AST.parse_str("break")[0]
-            ifSt.token = Token(t1.code, TokenType.POINTER, t1.start, t1.end)
+            ifSt.elseBody = parse_str("break")[0]
+        else:
+            ifSt.body = parse_str("break")[0]
+            ifSt.elseBody = None
 
-            loopSt = Statement(StatementType.LOOP)
-            loopSt.time = tim
-            loopSt.body = [ifSt] + AST.parse(body.children, macros) + [iter]
-            loopSt.token = Token(t0.code, TokenType.POINTER, t0.start, body.end)
+        loopSt = LoopStatement(
+            start=t0.start,
+            end=condition.end,
+            time=tim,
+            body=parse(body.children, macros) + [ifSt],
+        )
 
-            statements.append(loopSt)
-            return True
-        if t0.value == "do":
-            # do { <body> } while <time> (<condition>)
-            # do { <body> } until <time> (<condition>)
-            # do { <body> } while(<condition>)
-            # do { <body> } until(<condition>)
-            body = AST.next_token(tokens, index)
-            if body == None:
-                raise_syntax_error("Expected an expression", t0)
-            if body.type != TokenType.GROUP or body.open.value != "{":
-                raise_syntax_error("Expected an expression inside the braces", body)
-            tW = AST.next_token(tokens, index)
-            if tW == None or (tW.value != "while" and tW.value != "until"):
-                raise_syntax_error("Expected 'while' or 'until'", tW)
-            tim = None
-            condition = AST.next_token(tokens, index)
-            if is_time(condition):
-                tim = condition
-                condition = AST.next_token(tokens, index)
-            if condition.type != TokenType.GROUP or condition.open.value != "(":
-                raise_syntax_error(
-                    "Expected an expression inside the parentheses", condition
-                )
+        statements.append(loopSt)
 
-            ifSt = Statement(StatementType.IF_FLOW)
-            ifSt.condition = condition.children
-            if tW.value == "while":
-                ifSt.body = []
-                ifSt.elseBody = AST.parse_str("break")[0]
-            else:
-                ifSt.body = AST.parse_str("break")[0]
-                ifSt.elseBody = None
-            ifSt.token = Token(
-                condition.code, TokenType.POINTER, condition.start, condition.end
-            )
+        return True
+    if t0.value == "while" or t0.value == "until":
+        # while <time> (<condition>) { <body> }
+        # until <time> (<condition>) { <body> }
+        # while (<condition>) { <body> }
+        # until (<condition>) { <body> }
+        t1 = next_token(tokens, index)
+        if t1 == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        tim = None
+        if is_time(t1):
+            tim = t1
+            t1 = next_token(tokens, index)
+        if t1 == None:
+            raise_syntax_error("Expected an expression", tim or t0)
+            return False
+        if not isinstance(t1, GroupToken) or t1.open.value != "(":
+            raise_syntax_error("Expected a condition inside the parentheses", t1 or t0)
+            return False
+        body = next_token(tokens, index)
+        if body == None:
+            raise_syntax_error("Expected an expression", t1)
+            return False
+        if not isinstance(body, GroupToken) or body.open.value != "{":
+            raise_syntax_error("Expected an expression inside the parentheses", body)
+            return False
 
-            loopSt = Statement(StatementType.LOOP)
-            loopSt.time = tim
-            loopSt.body = AST.parse(body.children, macros) + [ifSt]
-            loopSt.token = Token(t0.code, TokenType.POINTER, t0.start, condition.end)
+        ifSt = IfFlowStatement(
+            start=t1.start, end=t1.end, condition=t1.children, body=[], elseBody=None
+        )
+        if t0.value == "while":
+            ifSt.elseBody = parse_str("break")[0]
+        else:
+            ifSt.body = parse_str("break")[0]
 
-            statements.append(loopSt)
+        loopSt = LoopStatement(
+            start=t0.start,
+            end=body.end,
+            time=tim,
+            body=[ifSt] + parse(body.children, macros),
+        )
 
-            return True
-        if t0.value == "while" or t0.value == "until":
-            # while <time> (<condition>) { <body> }
-            # until <time> (<condition>) { <body> }
-            # while (<condition>) { <body> }
-            # until (<condition>) { <body> }
-            t1 = AST.next_token(tokens, index)
-            if t1 == None:
-                raise_syntax_error("Expected an expression", t0)
-            tim = None
-            if is_time(t1):
-                tim = t1
-                t1 = AST.next_token(tokens, index)
-            if t1 == None:
-                raise_syntax_error("Expected an expression", tim or t0)
-            if t1.type != TokenType.GROUP or t1.open.value != "(":
-                raise_syntax_error(
-                    "Expected a condition inside the parentheses", t1 or t0
-                )
-            body = AST.next_token(tokens, index)
-            if body == None:
-                raise_syntax_error("Expected an expression", t1)
-            if body.type != TokenType.GROUP or body.open.value != "{":
-                raise_syntax_error(
-                    "Expected an expression inside the parentheses", body
-                )
+        statements.append(loopSt)
+        return True
+    if t0.value == "loop":
+        # loop <time> { <body> }
+        # loop { <body> }
+        body = next_token(tokens, index)
+        if body == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        tim = None
+        if is_time(body):
+            tim = body
+            body = next_token(tokens, index)
+        if body == None:
+            raise_syntax_error("Expected an expression", tim or t0)
+            return False
+        if not isinstance(body, GroupToken) or body.open.value != "{":
+            raise_syntax_error("Expected an expression inside the parentheses", body)
+            return False
+        statement = LoopStatement(
+            start=t0.start, end=body.end, time=tim, body=parse(body.children, macros)
+        )
 
-            ifSt = Statement(StatementType.IF_FLOW)
-            ifSt.condition = t1.children
-            if t0.value == "while":
-                ifSt.body = []
-                ifSt.elseBody = AST.parse_str("break")[0]
-            else:
-                ifSt.body = AST.parse_str("break")[0]
-                ifSt.elseBody = None
-            ifSt.token = Token(t1.code, TokenType.POINTER, t1.start, t1.end)
-
-            loopSt = Statement(StatementType.LOOP)
-            loopSt.time = tim
-            loopSt.body = [ifSt] + AST.parse(body.children, macros)
-            loopSt.token = Token(t0.code, TokenType.POINTER, t0.start, body.end)
-
-            statements.append(loopSt)
-            return True
-        if t0.value == "loop":
-            # loop <time> { <body> }
-            # loop { <body> }
-            body = AST.next_token(tokens, index)
-            if body == None:
-                raise_syntax_error("Expected an expression", t0)
-            tim = None
-            if is_time(body):
-                tim = body
-                body = AST.next_token(tokens, index)
-            if body == None:
-                raise_syntax_error("Expected an expression", tim or t0)
-            if body.type != TokenType.GROUP or body.open.value != "{":
-                raise_syntax_error(
-                    "Expected an expression inside the parentheses", body
-                )
-            statement = Statement(StatementType.LOOP)
-            statement.time = tim
-            statement.token = Token(t0.code, TokenType.POINTER, t0.start, body.end)
-            statement.body = AST.parse(body.children, macros)
-            statements.append(statement)
-            return True
-        if (
-            (t0.value == "if" or t0.value == "unless" or t0.value == "else")
-            and index[0] < len(tokens) - 2
-            and (t0.value == "else" or tokens[index[0] + 1].type == TokenType.GROUP)
+        statements.append(statement)
+        return True
+    if (
+        (t0.value == "if" or t0.value == "unless" or t0.value == "else")
+        and index[0] < len(tokens) - 2
+        and (t0.value == "else" or tokens[index[0] + 1].type == TokenType.GROUP)
+    ):
+        # if ( <condition> ) { <body> } else { <body> }
+        # unless ( <condition> ) { <body> } else { <body> }
+        t1 = next_token(tokens, index)  # for else this is {} or statement start
+        t2 = next_token(tokens, index) if t0.value != "else" else t1
+        stats = []
+        end_ind = 0
+        if t1 == None or t2 == None:
+            raise_syntax_error("Expected an expression", t0)
+            return False
+        if t0.value != "else" and (
+            not isinstance(t1, GroupToken) or t1.open.value != "("
         ):
-            # if ( <condition> ) { <body> } else { <body> }
-            # unless ( <condition> ) { <body> } else { <body> }
-            t1 = AST.next_token(tokens, index)  # for else this is {} or statement start
-            t2 = AST.next_token(tokens, index) if t0.value != "else" else t1
-            if t1 == None or t2 == None:
-                raise_syntax_error("Expected an expression", t0)
-            if t0.value != "else" and t1.open.value != "(":
-                raise_syntax_error("Expected an expression inside the parentheses", t1)
-            stats = []
-            end_ind = 0
-            if t0.value == "else":
-                if len(statements) == 0 or statements[-1].type != StatementType.IF_FLOW:
-                    raise_syntax_error(
-                        "Expected an if statement before the else statement", t0
-                    )
-                t1 = t0
+            raise_syntax_error("Expected an expression inside the parentheses", t1)
+            return False
+        if t0.value == "else":
+            if len(statements) == 0 or statements[-1].type != StatementType.IF_FLOW:
+                raise_syntax_error(
+                    "Expected an if statement before the else statement", t0
+                )
+            index[0] -= 1
+        #print("----------------------------------")
+        if isinstance(t2, GroupToken) and t2.open.value == "{":
+            #show_err("1", t0.code, t0.start, t0.end)
+            stats = parse(t2.children, macros)
+            end_ind = t2.end
+        else:
+            if t0.value != "else":
                 index[0] -= 1
-            if t2.type == TokenType.GROUP and t2.open.value == "{":
-                stats = AST.parse(t2.children, macros)
-                end_ind = t2.end
-            else:
-                if t0.value == "if":
-                    index[0] -= 1
-                AST.parse_iterate(stats, tokens, index, macros)
-                if len(stats) != 1:
-                    raise_syntax_error("Expected a statement", t1)
-                end_ind = stats[0].token.end
-            if t0.value == "else":
-                if_st = statements[-1]
-                if_st.elseBody = stats
-                index[0] += 1
-                return True
-
-            statement = Statement(StatementType.IF_FLOW)
-            statement.condition = t1.children
-            statement.body = stats
-            statement.elseBody = None
-            statement.token = Token(t0.code, TokenType.POINTER, t0.start, end_ind)
-            statements.append(statement)
+            parse_iterate(stats, tokens, index, macros)
+            #print(tokens[index[0] + 1], stats[0])
+            #show_err("2", t0.code, t0.start, t0.end)
+            if len(stats) != 1:
+                raise_syntax_error("Expected a statement", t1)
+            end_ind = stats[0].end
+        #print("end", t0.value)
+        #print("----------------------------------")
+        if t0.value == "else":
+            if_st = statements[-1]
+            if not isinstance(if_st, IfFlowStatement):
+                raise_syntax_error(
+                    "Expected an if statement before the else statement", t0
+                )
+                return False
+            if_st.elseBody = stats
+            index[0] += 1
             return True
 
-        if t0.value == "define":
-            # define <type> <name>
-            t1 = AST.next_token(tokens, index)
-            t2 = AST.next_token(tokens, index)
-            t3 = AST.next_token(tokens, index)
-            if t1 == None or t2 == None or t3 == None:
-                raise_syntax_error("Unfinished define statement", t0)
-            if t1.value not in VARIABLE_TYPES:
-                raise_syntax_error(
-                    "Expected 'int', 'float' for the variable definition",
-                    t1,
-                )
-            if (
-                t2.type != TokenType.IDENTIFIER
-                and t2.type != TokenType.SELECTOR_IDENTIFIER
-            ):
-                raise_syntax_error(
-                    "Expected a valid variable name for the define statement", t2
-                )
-            if t3.type not in ENDERS:
-                raise_syntax_error(
-                    "Expected an expression terminator after the define statement",
-                    t3,
-                )
-            statement = Statement(StatementType.INTRODUCE_VARIABLE)
-            statement.name = t2
-            statement.varType = t1
-            statement.token = Token(t0.code, TokenType.POINTER, t0.start, t2.end)
-            statements.append(statement)
-            return True
+        if not isinstance(t1, GroupToken):
+            return False  # for the linter
 
-        if t0.value == "function":
-            # function <name>( <arguments> ): <type> { <body> }
-            t1 = AST.next_token(tokens, index)
-            t2 = AST.next_token(tokens, index)
-            t3 = AST.next_token(tokens, index)
-            t4 = AST.next_token(tokens, index)
-            if t1 == None or (
-                t1.type != TokenType.FUNCTION_CALL and t1.type != TokenType.IDENTIFIER
-            ):
-                raise_syntax_error(
-                    "Expected a function name for the function definition",
-                    t0,
-                )
-            if t1.type == TokenType.FUNCTION_CALL and t1.func.value == "tick":
-                raise_syntax_error(
-                    "Tick function does not support arguments, remove the parentheses",
-                    t1,
-                )
-            is_tick = t1.type == TokenType.IDENTIFIER and t1.value == "tick"
-            if is_tick:
-                t4 = t2
-                index[0] -= 2
-                pass
-            elif (
-                t2 == None
-                or t2.value != ":"
-                or t3 == None
-                or (t3.value not in VARIABLE_TYPES and t3.value != "void")
-            ):
-                raise_syntax_error("Expected a valid return type for the function", t1)
-            if t4 == None or t4.type != TokenType.GROUP or t4.open.value[0] != "{":
-                raise_syntax_error(
-                    "Expected curly brackets for the function definition", t1
-                )
-            statement = Statement(StatementType.DEFINE_FUNCTION)
-            statement.name = t1 if t1.type == TokenType.IDENTIFIER else t1.func
-            statement.body = AST.parse(t4.children, macros)
-            statement.arguments = []
-            statement.token = Token(
-                t0.code, TokenType.POINTER, t0.start, t2.end if is_tick else t4.end
+        statement = IfFlowStatement(
+            start=t0.start,
+            end=end_ind,
+            condition=t1.children,
+            body=stats,
+            elseBody=None,
+        )
+        statements.append(statement)
+        return True
+
+    if t0.value == "define":
+        # define <type> <name>
+        t1 = next_token(tokens, index)
+        t2 = next_token(tokens, index)
+        t3 = next_token(tokens, index)
+        if t1 == None or t2 == None or t3 == None:
+            raise_syntax_error("Unfinished define statement", t0)
+            return False
+        if t1.value not in VARIABLE_TYPES:
+            raise_syntax_error(
+                "Expected 'int', 'float' for the variable definition",
+                t1,
             )
-            statement.returns = (
-                Token("void", TokenType.KEYWORD, 0, 4) if is_tick else t3
+            return False
+        if t2.type != TokenType.IDENTIFIER and t2.type != TokenType.SELECTOR_IDENTIFIER:
+            raise_syntax_error(
+                "Expected a valid variable name for the define statement", t2
             )
-            arg_names = []
-            if t1.type == TokenType.FUNCTION_CALL:
-                for arg in Tokenizer.split_tokens(t1.children):
-                    if (
-                        len(arg) != 2
-                        or arg[0].value not in VARIABLE_TYPES
-                        or arg[1].type != TokenType.IDENTIFIER
-                    ):
-                        raise_syntax_error("Invalid argument for a function", arg[0])
-                    arg_type = arg[0].value
-                    arg_name = arg[1].value
-                    if arg_name in arg_names:
-                        raise_syntax_error("Argument name is already used", arg)
-                    statement.arguments.append([arg_type, arg_name, 0])
-                    arg_names.append(arg_name)
-
-            statements.append(statement)
-            return True
-
-        if t0.type == TokenType.KEYWORD and t0.value == "return":
-            # return <expression>
-            expr = []
-            ind = index[0] + 1
-            if ind <= len(tokens) and tokens[ind].type not in ENDERS:
-                (ind, expr) = AST.read_expression(tokens, ind)
-                if len(expr) == 0:
-                    raise_syntax_error(
-                        "Expected an expression after the return keyword", t0
-                    )
-            statement = Statement(StatementType.RETURN)
-            statement.keyword = t0
-            statement.expr = expr
-            statement.token = Token(
-                t0.code,
-                TokenType.POINTER,
-                t0.start,
-                t0.end if len(expr) == 0 else expr[-1].end,
+            return False
+        if t3.type not in ENDERS:
+            raise_syntax_error(
+                "Expected an expression terminator after the define statement",
+                t3,
             )
-            statements.append(statement)
-            index[0] = ind
-            return True
+            return False
+        statement = IntroduceVariableStatement(
+            start=t0.start, end=t2.end, name=t2, varType=t1
+        )
+        statements.append(statement)
+        return True
 
-        if t0.type == TokenType.KEYWORD and (
-            t0.value == "break" or t0.value == "continue"
+    if t0.value == "function":
+        # function <name>( <arguments> ): <type> { <body> }
+        t1 = next_token(tokens, index)
+        t2 = next_token(tokens, index)
+        t3 = next_token(tokens, index)
+        t4 = next_token(tokens, index)
+        if t1 == None or (
+            t1.type != TokenType.FUNCTION_CALL and t1.type != TokenType.IDENTIFIER
         ):
-            # break
-            # continue
-            statement = Statement(
-                StatementType.BREAK if t0.value == "break" else StatementType.CONTINUE
+            raise_syntax_error(
+                "Expected a function name for the function definition",
+                t0,
             )
-            statement.keyword = t0
-            statement.token = Token(t0.code, TokenType.POINTER, t0.start, t0.end)
-            statements.append(statement)
-            return True
+            return False
+        if isinstance(t1, GroupToken) and t1.func and t1.func.value == "tick":
+            raise_syntax_error(
+                "Tick function does not support arguments, remove the parentheses",
+                t1,
+            )
+            return False
+        if t2 == None or t3 == None:
+            raise_syntax_error("Expected at least two expressions", t1)
+            return False
+        is_tick = t1.type == TokenType.IDENTIFIER and t1.value == "tick"
+        if is_tick:
+            t4 = t2
+            index[0] -= 2
+            pass
+        elif t2.value != ":" or (t3.value not in VARIABLE_TYPES and t3.value != "void"):
+            raise_syntax_error("Expected a valid return type for the function", t1)
+            return False
+        if t4 == None or not isinstance(t4, GroupToken) or t4.open.value[0] != "{":
+            raise_syntax_error(
+                "Expected curly brackets for the function definition", t1
+            )
+            return False
+        statement = DefineFunctionStatement(
+            start=t0.start,
+            end=t2.end if is_tick else t4.end,
+            name=t1.func if isinstance(t1, GroupToken) and t1.func else t1,
+            body=parse(t4.children, macros),
+            arguments=[],
+            returns=Token("void", TokenType.KEYWORD, 0, 4) if is_tick else t3,
+        )
+        arg_names = []
+        if isinstance(t1, GroupToken) and t1.func:
+            for arg in split_tokens(t1.children):
+                if (
+                    len(arg) != 2
+                    or arg[0].value not in VARIABLE_TYPES
+                    or arg[1].type != TokenType.IDENTIFIER
+                ):
+                    raise_syntax_error("Invalid argument for a function", arg[0])
+                arg_type = arg[0].value
+                arg_name = arg[1].value
+                if arg_name in arg_names:
+                    raise_syntax_error("Argument name is already used", arg)
+                statement.arguments.append(FunctionArgument(arg_type, arg_name))
+                arg_names.append(arg_name)
 
-        (ind, expr) = AST.read_expression(tokens, index[0])
-        if ind == None:
-            raise_syntax_error("Unexpected token", t0)
-        statement = Statement(StatementType.INLINE)
-        statement.expr = expr
-        statement.token = Token(t0.code, TokenType.POINTER, t0.start, expr[-1].end)
+        statements.append(statement)
+        return True
+
+    if t0.type == TokenType.KEYWORD and t0.value == "return":
+        # return <expression>
+        expr = []
+        ind = index[0] + 1
+        if ind <= len(tokens) and tokens[ind].type not in ENDERS:
+            (ind, expr) = read_expression(tokens, ind)
+            if len(expr) == 0:
+                raise_syntax_error(
+                    "Expected an expression after the return keyword", t0
+                )
+        statement = ReturnStatement(
+            start=t0.start,
+            end=t0.end if len(expr) == 0 else expr[-1].end,
+            keyword=t0,
+            expr=expr,
+        )
         statements.append(statement)
         index[0] = ind
         return True
 
-    def parse(tokens: List[Token], macros: List):
-        statements: List[Statement] = []
-        index = [-1]
+    if t0.type == TokenType.KEYWORD and (t0.value == "break" or t0.value == "continue"):
+        # break
+        # continue
+        statement = (BreakStatement if t0.value == "break" else ContinueStatement)(
+            start=t0.start, end=t0.end, keyword=t0
+        )
+        statements.append(statement)
+        return True
 
-        while AST.parse_iterate(statements, tokens, index, macros):
-            pass
-        return statements
+    if t0.value in EXECUTE_MACROS:
+        # as @a at @s ... { <body> }
+        gotTokens = [t0]
+        bodyG: GroupToken
+        while True:
+            t = next_token(tokens, index)
+            if t == None:
+                raise_syntax_error("Unexpected end of file", gotTokens[-1])
+                break
+            if isinstance(t, GroupToken) and t.open.value == "{":
+                bodyG = t
+                break
+            gotTokens.append(t)
+
+        statement = ExecuteMacroStatement(
+            start=t0.start,
+            end=gotTokens[-1].end,
+            command=" ".join(t.value for t in gotTokens),
+            body=parse(bodyG.children, macros),
+        )
+        statements.append(statement)
+        return True
+
+    (ind, expr) = read_expression(tokens, index[0])
+    if ind == None:
+        raise_syntax_error("Unexpected token", t0)
+    statement = InlineStatement(start=t0.start, end=expr[-1].end, expr=expr)
+    statements.append(statement)
+    index[0] = ind
+    return True
+
+
+def parse(tokens: List[Token], macros: List):
+    statements: List[Statement] = []
+    index = [-1]
+
+    while parse_iterate(statements, tokens, index, macros):
+        pass
+    return statements

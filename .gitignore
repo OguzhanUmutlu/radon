@@ -1,6 +1,7 @@
 test.cmd
 code.dp
 build
-src/__pycache__
+**/__pycache__
 .vscode
 .stuff
+test.mcfunction

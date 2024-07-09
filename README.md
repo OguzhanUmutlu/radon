@@ -8,12 +8,12 @@ Install the repository by clicking `Code` then `Download ZIP` and then extract i
 
 Once it's installed you can run the `main.py` python file with the path of your file. Example: `python3 main.py /usr/code.radon`
 
-This should create a datapack with a folder name of `build/` in the directory of your radon file.
+This should create mcfunction files in a folder named `build/` in the directory of your radon file.
 
 You can change the name of the folder and datapack like this:
 
 ```shell
-python3 main.py /usr/code.radon -o=my_folder -n="My Datapack's Name" -d="This is the description of my datapack."
+python3 main.py /usr/code.radon -o=/usr/datapack/data/my_pack/functions -n="My Datapack's Name" -d="This is the description of my datapack."
 ```
 
 ## Syntax

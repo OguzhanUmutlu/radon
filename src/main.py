@@ -1,9 +1,6 @@
-from tokenizer import Tokenizer
-from dp_ast import AST
-from transpiler import Transpiler
+from transpiler import transpile_str
 from argparse import ArgumentParser
 from os import path, makedirs
-import shutil
 
 parser = ArgumentParser(description="CLI")
 parser.add_argument(
@@ -37,13 +34,13 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-build_dir = path.realpath(args.o or args.file + "/../build")
+build_dir = path.realpath(args.o or (args.file + "/../build"))
 
 file = open(args.file, "r")
 code = file.read()
 file.close()
 
-transpiler = Transpiler.transpile_str(code)
+transpiler = transpile_str(code)
 
 if args.n:
     transpiler.pack_name = args.n
@@ -56,7 +53,7 @@ pack_name = transpiler.pack_name
 pack_desc = transpiler.pack_desc
 pack_format = transpiler.pack_format
 
-shutil.rmtree(build_dir, ignore_errors=True)
+'''shutil.rmtree(build_dir, ignore_errors=True)
 makedirs(build_dir, exist_ok=True)
 
 with open(build_dir + f"/pack.mcmeta", "w") as file:
@@ -96,12 +93,14 @@ if "tick" in transpiler.functions:
     }""".replace(
                 "%pack_name", pack_name
             )
-        )
+        )'''
 
-makedirs(build_dir + f"/data/{pack_name}/functions", exist_ok=True)
+# f"/data/{pack_name}/functions"
+makedirs(build_dir + f"/", exist_ok=True)
 
 for filename in transpiler.files:
-    pt = build_dir + f"/data/{pack_name}/functions/" + filename + ".mcfunction"
+    # f"/data/{pack_name}/functions"
+    pt = build_dir + f"/" + filename + ".mcfunction"
     makedirs(path.realpath(pt + "/../"), exist_ok=True)
     with open(pt, "w") as file:
         file.write(

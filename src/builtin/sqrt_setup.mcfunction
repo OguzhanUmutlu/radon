@@ -1,0 +1,1 @@
+scoreboard players set __sqrt__4 --temp-- 4

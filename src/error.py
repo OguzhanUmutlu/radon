@@ -42,6 +42,7 @@ def show_err(text, code, start, end):
 
 def raise_syntax_error(text, token):
     print("Token: " + str(token))
+    token.end += 1
     raise_syntax_error_t(text, token.code, token.start, token.end)
 
 

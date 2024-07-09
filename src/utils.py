@@ -1,3 +1,6 @@
+from typing import List, Union, Literal
+
+
 class UniversalStrMixin:
     def __str__(self):
         attributes = [
@@ -5,3 +8,53 @@ class UniversalStrMixin:
             for key, value in filter(lambda x: x[0] != "code", self.__dict__.items())
         ]
         return f"{self.__class__.__name__}({', '.join(attributes)})"
+
+
+class FunctionArgument:
+    def __init__(self, type: str, name: str, id: str = ""):
+        self.type = type
+        self.name = name
+        self.id = id
+
+
+class VariableDeclaration:
+    def __init__(self, type: str, constant: bool):
+        self.type = type
+        self.constant = constant
+
+
+class FunctionDeclaration:
+    def __init__(
+        self,
+        type: Union[Literal["radon"], Literal["mcfunction"], Literal["python"]],
+        name: str,
+        file_name: str,
+        returns: str,
+        returnId: str,
+        arguments: List[FunctionArgument],
+        direct: bool = False,
+        libs: List[str] = [],
+        initLibs: List[str] = [],
+        function=None,
+    ):
+        self.type = type
+        self.name = name
+        self.file_name = file_name
+        self.returns = returns
+        self.returnId = returnId
+        self.arguments = arguments
+        self.direct = direct
+        self.libs = libs
+        self.initLibs = initLibs
+        self.function = function
+
+
+class TranspilerContext:
+    def __init__(
+        self, transpiler, file_name, file, function: FunctionDeclaration | None, loop
+    ):
+        self.transpiler = transpiler
+        self.file_name = file_name
+        self.file = file
+        self.function = function
+        self.loop = loop
