@@ -1,4 +1,4 @@
-from transpiler import transpile_str
+from transpiler import transpile_str, Transpiler
 from argparse import ArgumentParser
 from os import path, makedirs
 
@@ -40,7 +40,13 @@ file = open(args.file, "r")
 code = file.read()
 file.close()
 
-transpiler = transpile_str(code)
+transpiler: Transpiler
+
+try:
+    transpiler = transpile_str(code)
+except SyntaxError as e:
+    print(e)
+    exit(1)
 
 if args.n:
     transpiler.pack_name = args.n

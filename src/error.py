@@ -33,11 +33,15 @@ def show_err(text, code, start, end):
     start_line_index = max(0, line_start - 2)
     end_line_index = min(len(lines) - 1, line_end + 2)
 
+    printing = ""
+
     for i in range(start_line_index, end_line_index + 1):
         prefix = f"{i + 1} | "
-        print(prefix + lines[i])
+        printing += prefix + lines[i] + "\n"
 
-    print(text)
+    printing += text
+
+    return printing
 
 
 def raise_syntax_error(text, token):
@@ -47,10 +51,15 @@ def raise_syntax_error(text, token):
 
 
 def raise_syntax_error_t(text, code, start, end):
-    show_err(f"\n\033[31mSyntaxError: {text}\033[0m", code, start, end)
-    exit(1)
+    raise SyntaxError(
+        show_err(f"\n\033[31mSyntaxError: {text}\033[0m", code, start, end)
+    )
 
 
 def show_warning(text, token):
     print("Token: " + str(token))
-    show_err(f"\n\033[31mWarning: {text}\033[0m", token.code, token.start, token.end)
+    print(
+        show_err(
+            f"\n\033[31mWarning: {text}\033[0m", token.code, token.start, token.end
+        )
+    )

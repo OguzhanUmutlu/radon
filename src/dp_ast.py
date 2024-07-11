@@ -1,4 +1,3 @@
-from ast import If
 from enum import Enum
 from typing import List
 
@@ -12,7 +11,7 @@ from tokenizer import (
     split_tokens,
     tokenize,
 )
-from error import raise_syntax_error, show_err
+from error import raise_syntax_error
 from utils import FunctionArgument, UniversalStrMixin
 
 ENDERS = {
@@ -652,22 +651,22 @@ def parse_iterate(
                     "Expected an if statement before the else statement", t0
                 )
             index[0] -= 1
-        #print("----------------------------------")
+        # print("----------------------------------")
         if isinstance(t2, GroupToken) and t2.open.value == "{":
-            #show_err("1", t0.code, t0.start, t0.end)
+            # show_err("1", t0.code, t0.start, t0.end)
             stats = parse(t2.children, macros)
             end_ind = t2.end
         else:
             if t0.value != "else":
                 index[0] -= 1
             parse_iterate(stats, tokens, index, macros)
-            #print(tokens[index[0] + 1], stats[0])
-            #show_err("2", t0.code, t0.start, t0.end)
+            # print(tokens[index[0] + 1], stats[0])
+            # show_err("2", t0.code, t0.start, t0.end)
             if len(stats) != 1:
                 raise_syntax_error("Expected a statement", t1)
             end_ind = stats[0].end
-        #print("end", t0.value)
-        #print("----------------------------------")
+        # print("end", t0.value)
+        # print("----------------------------------")
         if t0.value == "else":
             if_st = statements[-1]
             if not isinstance(if_st, IfFlowStatement):

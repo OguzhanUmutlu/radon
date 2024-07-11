@@ -1,9 +1,10 @@
 from typing import Dict, List, Union
+import os
+import sys
 from tokenizer import (
     GroupToken,
     SelectorIdentifierToken,
     Token,
-    TokenType,
     SET_OP,
     INC_OP,
     CMP_OP,
@@ -13,19 +14,24 @@ from tokenizer import (
 )
 from dp_ast import ContinueStatement, DefineFunctionStatement, ExecuteMacroStatement, IfFlowStatement, ImportStatement, InlineStatement, IntroduceVariableStatement, LoopStatement, ReturnStatement, ScheduleStatement, Statement, StatementType, COMMANDS, make_expr, parse_str
 from error import raise_syntax_error, raise_syntax_error_t
-import os
-import sys
 from builtin.sqrt import LIB as LIB_SQRT
-from utils import FunctionDeclaration, TranspilerContext, VariableDeclaration
+from utils import FunctionDeclaration, TranspilerContext, VariableDeclaration, TokenType
+
+cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
+if sys.argv[0] == "":
+    cwd = "/home/pyodide"
+
 
 builtin = {
     "sqrt": LIB_SQRT
 }
 
 _expr_id = 0
-FLOAT_PREC = 46540  # floor(sqrt(INT32_MAX = 2147483647))
-cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
+FLOAT_PREC = 10000
 
+def get_lib_contents(path: str):
+    with open(cwd + "/" + path, "r") as f:
+        return f.read()
 
 def get_expr_id():
     global _expr_id
@@ -58,7 +64,10 @@ def _compute(a, b, typeA, op, typeB):
         if op in list("+-"):
             return l
         opN = "/" if op == "*" else "*"
-        return l + [f"scoreboard players operation {a} {opN}= FLOAT_PREC --temp--"]
+        l2 = [f"scoreboard players operation {a} {opN}= FLOAT_PREC --temp--"]
+
+        # Multiplication should be done to not lose precision
+        return (l + l2) if op == "*" else (l2 + l)
     if typeA == "i" and typeB == "f":
         return _float2int(b) + _compute(a, b, "i", op, "i")
     if typeA == "f" and typeB == "i":
@@ -129,12 +138,6 @@ def _get_score_type(score):
     elif isinstance(score, float):
         return "float"
     return "float" if score.startswith("float_") else "int"
-
-
-def get_lib_contents(path: str):
-    with open(cwd + "/" + path, "r") as f:
-        return f.read()
-
 
 # expression tokens: int_literal, float_literal, identifier, selector_identifier
 
@@ -530,7 +533,7 @@ class Transpiler:
                 repl = cmd[si + (2 if cmd[si + 1] == "(" else 5) : i]
                 (expr, _) = tokenize(repl)
                 expr = expr[:-1]
-                loc = self.get_expr_loc(expr, ctx)
+                (loc, loc_type) = self.get_expr_loc(expr, ctx)
 
                 if cmd[si + 1] == "(":
                     cmd_str += f"$(_{repl_i})"
@@ -539,8 +542,8 @@ class Transpiler:
                             f"data modify storage cmd_mem _{repl_i} set value {loc}"
                         )
                     else:
-                        if loc.startswith("float_"):
-                            precStr = str(1 / FLOAT_PREC)
+                        if loc_type == "float":
+                            precStr = "{:.7f}".format(1 / FLOAT_PREC)
                             file.append(
                                 f"execute store result storage cmd_mem _{repl_i} float {precStr} run scoreboard players get {loc}"
                             )
@@ -972,14 +975,14 @@ class Transpiler:
             TokenType.SELECTOR_IDENTIFIER,
         }
         if is_var:
-            return self.__get_var_loc(tokens[0], ctx)[0]
+            return self.__get_var_loc(tokens[0], ctx)
 
         r = self.transpile_expr(tokens, ctx)
         if isinstance(r, str):
-            return r + " --temp--"
-        return r
+            return (r + " --temp--", "float" if r.startswith("float_") else "int")
+        return (r, "float" if isinstance(r, float) else "int")
 
-    def transpile_expr(self, tokens, ctx: TranspilerContext):
+    def transpile_expr(self, tokens: List[Token], ctx: TranspilerContext):
         tokens = make_expr(tokens)
         r = self._transpile_expr(tokens, ctx)
         if isinstance(r, Token):

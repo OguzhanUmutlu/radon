@@ -1,0 +1,84 @@
+@font-face {
+    font-family: Minecraft;
+    src: url("Minecraft.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+    margin: 16px 5%;
+    background: #36393F;
+    font-family: Minecraft, sans-serif;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #36393F;
+}
+
+::-webkit-scrollbar-thumb {
+    background-clip: content-box;
+    background-color: #d6dee1;
+    border: .3rem solid #0000;
+    border-radius: 20px;
+}
+
+::-webkit-scrollbar {
+    width: .9rem;
+}
+
+input,
+textarea,
+.file,
+.error {
+    font-family: Minecraft, sans-serif;
+    resize: none;
+    margin-top: 20px;
+    width: calc(100% - 40px);
+    padding: 20px;
+    background: #464a51;
+    outline: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    letter-spacing: 1.5px;
+    border-radius: 15px;
+}
+
+.file {
+    width: 100%;
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.filename {
+    background-color: #425375;
+    padding: 10px;
+    padding-left: 15px;
+    padding-right: 15px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    margin-bottom: 10px;
+}
+
+.content {
+    padding: 10px;
+    padding-bottom: 0;
+}
+
+textarea {
+    height: 20vh;
+    min-height: 20vh;
+    max-height: 65vh;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.title {
+    letter-spacing: 1.5px;
+    color: white;
+    font-size: 48px;
+    font-weight: 400;
+    text-align: center;
+}

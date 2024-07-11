@@ -1,4 +1,30 @@
 from typing import List, Union, Literal
+from enum import Enum
+import os
+import sys
+
+
+class TokenType(Enum):
+    KEYWORD = "keyword"
+    IDENTIFIER = "identifier"
+    STRING_LITERAL = "string_literal"
+    INT_LITERAL = "int_literal"
+    FLOAT_LITERAL = "float_literal"
+    OPERATOR = "operator"
+    WHITESPACE = "whitespace"
+    SYMBOL = "symbol"
+    EOL = "eol"  # end of line, new line
+    EOF = "eof"  # end of file
+    EOE = "eoe"  # end of expression, semicolon
+
+    GROUP = "group"
+    FUNCTION_CALL = "function_call"
+    SELECTOR = "selector"
+    SELECTOR_IDENTIFIER = "selector_identifier"
+    STORAGE_NBT_IDENTIFIER = "storage_nbt_identifier"
+    ENTITY_NBT_IDENTIFIER = "entity_nbt_identifier"
+
+    POINTER = "pointer"  # This is not a token type. This is used to point to a part of the user code.
 
 
 class UniversalStrMixin:
