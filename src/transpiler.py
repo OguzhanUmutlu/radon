@@ -32,7 +32,7 @@ def reset_expr_id():
     global _expr_id
     _expr_id = 0
 
-FLOAT_PREC = 10000
+FLOAT_PREC = 1000
 
 def get_lib_contents(path: str):
     with open(cwd + "/" + path, "r") as f:
