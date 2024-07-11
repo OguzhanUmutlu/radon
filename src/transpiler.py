@@ -27,6 +27,11 @@ builtin = {
 }
 
 _expr_id = 0
+
+def reset_expr_id():
+    global _expr_id
+    _expr_id = 0
+
 FLOAT_PREC = 10000
 
 def get_lib_contents(path: str):
@@ -163,6 +168,7 @@ class Transpiler:
             "# Setup #",
             "",
             'scoreboard objectives add --temp-- dummy ""',
+            'scoreboard objectives add global dummy ""',
             'scoreboard objectives add __break__ dummy ""',
             'scoreboard objectives add __continue__ dummy ""',
             "scoreboard players set null --temp-- 0",
@@ -405,7 +411,7 @@ class Transpiler:
                     f'scoreboard objectives add {name} dummy ""'
                 )
                 self.files["__load__"].append(
-                    f"scoreboard objectives enable !global {name}"
+                    f"scoreboard objectives enable {name} global"
                 )
                 continue
             if isinstance(statement, ExecuteMacroStatement):
@@ -630,7 +636,7 @@ class Transpiler:
                 raise_syntax_error("Undefined variable", t)
 
             var_type = self.variables[t.value].type
-            return (f"!global {t.value}", var_type)
+            return (f"{t.value} global", var_type)
         raise SyntaxError("")
 
     def __get_expr_type(self, t, ctx: TranspilerContext):
@@ -764,10 +770,8 @@ class Transpiler:
         if t0.value in COMMANDS:
             return self.run_cmd(t0.code[t0.start : tokens[-1].end], ctx)
         if tokens[1].value in INC_OP:
-            name = t0.name.value if isinstance(t0, SelectorIdentifierToken) else t0.value
-            score_player = (
-                t0.selector.value if isinstance(t0, SelectorIdentifierToken) else "!global"
-            )
+            name = t0.name.value if isinstance(t0,SelectorIdentifierToken) else t0.value
+            score = f"{t0.selector.value} {name}" if isinstance(t0, SelectorIdentifierToken) else name+  " global"
             if name not in self.variables:
                 raise_syntax_error("Undefined variable", t0)
 
@@ -777,9 +781,9 @@ class Transpiler:
             id = get_expr_id()
             eid = var_type + "_" + str(id)
             file.append(
-                f"scoreboard players operation {eid} --temp-- = {score_player} {name}"
+                f"scoreboard players operation {eid} --temp-- = {score}"
             )
-            file.append(f"scoreboard players {action} {score_player} {name} {inc}")
+            file.append(f"scoreboard players {action} {score} {inc}")
             return eid
         if t0.value in SET_OP:
             t1 = tokens[1]
@@ -788,10 +792,10 @@ class Transpiler:
                 if isinstance(t1, SelectorIdentifierToken)
                 else t1.value
             )
-            score_player = (
-                t1.selector.value
+            target_score = (
+                f"{t1.selector.value} {name}"
                 if isinstance(t1, SelectorIdentifierToken)
-                else "!global"
+                else f"{name} global"
             )
             expr = tokens[2:]
             if t0.value != "=" and name not in self.variables:
@@ -812,7 +816,7 @@ class Transpiler:
                         f"Variable was defined to be {exist_type}, got {var_type}",t1
                     )
                 file.append(
-                    f"scoreboard players operation {score_player} {name} = {loc}"
+                    f"scoreboard players operation {target_score} = {loc}"
                 )
                 id = get_expr_id()
                 eid = f"{var_type}_{id}"
@@ -845,11 +849,11 @@ class Transpiler:
             action = "add" if t0.value[0] == "+" else "remove"
             if isinstance(score, int):
                 if t0.value == "=":
-                    file.append(f"scoreboard players set {score_player} {name} {score}")
+                    file.append(f"scoreboard players set {target_score} {score}")
                 elif exist_type: # linter wants this
                     file.extend(
                         _compute(
-                            f"{score_player} {name}",
+                            target_score,
                             score,
                             exist_type[0],
                             t0.value[0],
@@ -859,12 +863,12 @@ class Transpiler:
             elif isinstance(score, float):
                 if t0.value == "=":
                     file.append(
-                        f"scoreboard players set {score_player} {name} {int(score * FLOAT_PREC)}"
+                        f"scoreboard players set {target_score} {int(score * FLOAT_PREC)}"
                     )
                 elif exist_type: # linter wants this
                     file.extend(
                         _compute(
-                            f"{score_player} {name}",
+                            target_score,
                             score,
                             exist_type[0],
                             t0.value[0],
@@ -877,12 +881,12 @@ class Transpiler:
                     var_type = "float"
                 if t0.value == "=":
                     file.append(
-                        f"scoreboard players operation {score_player} {name} = {score} --temp--"
+                        f"scoreboard players operation {target_score} = {score} --temp--"
                     )
                 elif exist_type: # linter wants this
                     file.extend(
                         _compute(
-                            f"{score_player} {name}",
+                            target_score,
                             f"{score} --temp--",
                             exist_type[0],
                             t0.value[0],

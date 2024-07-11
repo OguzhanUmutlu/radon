@@ -70,7 +70,6 @@ textarea {
     height: 20vh;
     min-height: 20vh;
     max-height: 65vh;
-    overflow-y: hidden;
     box-sizing: border-box;
     width: 100%;
 }

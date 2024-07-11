@@ -313,6 +313,7 @@ def read_expression(tokens: List[Token], start_index: int):
     index = start_index
     operator_count = 0
     result = []
+    is_cmd_expr = tokens[index].value in COMMANDS
 
     while index < length:
         operator_count += 1
@@ -321,7 +322,7 @@ def read_expression(tokens: List[Token], start_index: int):
         if token.type in {TokenType.EOF, TokenType.EOE}:
             break
         elif token.type == TokenType.EOL:
-            if operator_count % 2 == 0 and (
+            if (is_cmd_expr or operator_count % 2 == 0) and (
                 index == 0 or tokens[index - 1].value != "\\"
             ):
                 break

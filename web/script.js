@@ -24,10 +24,11 @@ console.timeEnd("Loaded radon");
 
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
-from transpiler import transpile_str
+from transpiler import transpile_str, reset_expr_id
 
 def main(namespace, code):
     try:
+        reset_expr_id()
         transpiler = transpile_str(code)
 
         for filename in transpiler.files:
