@@ -10,7 +10,7 @@ console.timeEnd("Loaded pyodide");
 
 console.log("Loading radon...");
 console.time("Loaded radon");
-let radon = await fetch("./radon.zip");
+let radon = await fetch("./radon.zip?v=" + RADON_VERSION);
 radon = await radon.blob();
 radon = await JSZip.loadAsync(radon);
 radon = radon.files;
@@ -23,7 +23,7 @@ for (const name in radon) {
 
 console.timeEnd("Loaded radon");
 
-const VERSION = pyodide.runPython(`from transpiler import VERSION_RADON
+const VERSION = pyodide.runPython(`from utils import VERSION_RADON
 
 VERSION_RADON`);
 versionDiv.innerText = VERSION;

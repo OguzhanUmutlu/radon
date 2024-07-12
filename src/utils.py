@@ -5,6 +5,8 @@ FLOAT_PREC = 1000
 
 _expr_id = 0
 
+VERSION_RADON = "0.0.3"
+
 
 def reset_expr_id():
     global _expr_id
