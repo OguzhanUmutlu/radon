@@ -37,6 +37,7 @@ OPERATORS_L = [
     "and",
     "or",
 ]
+WORD_OPERATORS = ["is not", "is", "and", "or"]
 INC_OP = ["++", "--"]
 CMP_OP = ["==", "!=", ">", "<", ">=", "<=", "is", "is not"]
 CMP_COMBINE_OP = ["&&", "||", "and", "or"]
@@ -59,8 +60,8 @@ KEYWORDS = [
     "break",
     "continue",
     "define",
-    "int",
-    "float",
+    # "int",
+    # "float",
     "string",
     "from",
     "import",
@@ -327,7 +328,7 @@ def _tokenize_iterate(
         return
 
     for op in OPERATORS_L:
-        if code[index[0] : index[0] + len(op)] == op:
+        if code[index[0] : index[0] + len(op) + (op in WORD_OPERATORS)] == op:
             token = Token(code, TokenType.OPERATOR, index[0], index[0] + len(op))
             if op in INC_OP:
                 if len(tokens) == 0 or (

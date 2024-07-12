@@ -1,5 +1,4 @@
-import stat
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 import os
 import sys
 from tokenizer import (
@@ -31,7 +30,14 @@ from dp_ast import (
     parse_str,
 )
 from error import raise_syntax_error, raise_syntax_error_t
-from utils import FunctionDeclaration, TranspilerContext, VariableDeclaration, TokenType
+from utils import (
+    FunctionDeclaration,
+    TranspilerContext,
+    VariableDeclaration,
+    TokenType,
+    FLOAT_PREC,
+    get_expr_id
+)
 
 VERSION_RADON = "0.0.1"
 
@@ -40,32 +46,23 @@ if sys.argv[0] == "":
     cwd = "/home/pyodide"
 
 
-from builtin.sqrt import LIB as LIB_SQRT
+from builtin.math import LIB as LIB_MATH
 from builtin.pyeval import LIB as LIB_EVAL
+from builtin.time import LIB as LIB_TIME
 
-builtin = {"sqrt": LIB_SQRT, "python": LIB_EVAL}
+builtin = {}
 
-
-_expr_id = 0
-
-
-def reset_expr_id():
-    global _expr_id
-    _expr_id = 0
-
-
-FLOAT_PREC = 1000
+for fnList in [LIB_MATH, LIB_EVAL, LIB_TIME]:
+    for fn in fnList:
+        if fn.name in builtin:
+            builtin[fn.name].append(fn)
+        else:
+            builtin[fn.name] = [fn]
 
 
 def get_lib_contents(path: str):
     with open(cwd + "/" + path, "r") as f:
         return f.read()
-
-
-def get_expr_id():
-    global _expr_id
-    _expr_id += 1
-    return _expr_id
 
 
 def _li2lf(a):
@@ -216,6 +213,7 @@ class Transpiler:
         self.variables["false"] = VariableDeclaration("int", True)
         self.variables["true"] = VariableDeclaration("int", True)
         self.variables["null"] = VariableDeclaration("int", True)
+        self.tickFile = []
         mainFile = []
         self.mainFile = mainFile
         self._transpile(
@@ -225,6 +223,11 @@ class Transpiler:
         loadF.append("# Main File #")
         loadF.append("")
         loadF += mainFile
+        if len(self.tickFile) > 0:
+            if "tick" not in self.files:
+                self.files["tick"] = self.tickFile
+            else:
+                self.files["tick"] = self.tickFile + self.files["tick"]
         return self
 
     def _transpile(self, statements: List[Statement], ctx: TranspilerContext):
@@ -569,7 +572,7 @@ class Transpiler:
                 repl = cmd[si + (2 if cmd[si + 1] == "(" else 5) : i]
                 (expr, _) = tokenize(repl)
                 expr = expr[:-1]
-                (loc, loc_type) = self.get_expr_loc(expr, ctx)
+                (loc, loc_type) = self.get_expr_loc(ctx, expr)
 
                 if cmd[si + 1] == "(":
                     cmd_str += f"$(_{repl_i})"
@@ -684,119 +687,111 @@ class Transpiler:
             file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
             return eid
         if isinstance(t, GroupToken) and t.func:
-            fnFound: FunctionDeclaration | None = None
-            for f in self.functions:
-                if f.file_name == t.func.value:
-                    fnFound = f
-                    break
-            if not fnFound and t.func.value not in builtin:
-                raise_syntax_error("Undefined function", t)
-                return 0
-            separated = split_tokens(t.children)
-            if not fnFound and t.func.value in builtin:
-                built = builtin[t.func.value]
-                if (
-                    isinstance(built, FunctionDeclaration)
-                    and built.type == "python-raw"
-                ):
-                    built.function(ctx, separated, t)
-                    return (
-                        "null"
-                        if built.returns == "void"
-                        else built.returns + "_" + built.returnId
-                    )
-                self.functions += built if isinstance(built, list) else [built]
-
-            given_args_types = []
-            given_args_locations = []
-            for index, arg in enumerate(separated):
-                if len(arg) == 1 and arg[0].type in [
-                    TokenType.IDENTIFIER,
-                    TokenType.SELECTOR_IDENTIFIER,
-                ]:
-                    (loc, var_type) = self.__get_var_loc(arg[0], ctx)
-                    given_args_types.append(var_type)
-                    given_args_locations.append(loc)
-                    continue
-                score = self.transpile_expr(arg, ctx)
-                score_type = _get_score_type(score)
-                if isinstance(score, int) or isinstance(score, float):
-                    given_args_locations.append(score)
-                else:
-                    given_args_locations.append(score + " --temp--")
-                given_args_types.append(score_type)
-
-            given_types = ",".join(given_args_types)
-
-            fn = None
-            for f in self.functions:
-                fn_arg_types = ",".join(arg.type for arg in f.arguments)
-                if fn_arg_types == given_types:
-                    fn = f
-                    break
-            if fn == None:
-                raise_syntax_error("Invalid arguments", t)
-                raise SyntaxError("")
-
-            returns = fn.returns
-            fn_args = fn.arguments
-
-            for lib in fn.libs:
-                self.add_lib_file(lib)
-            for lib in fn.initLibs:
-                self.init_lib_file(lib)
-
-            for index, arg in enumerate(fn_args):
-                eid = arg.id
-                loc = given_args_locations[index]
-                if isinstance(loc, int) or isinstance(loc, float):
-                    val = (
-                        int(score * FLOAT_PREC) if score_type == "float" else int(score)
-                    )
-                    file.append(f"scoreboard players set {eid} --temp-- {val}")
-                else:
-                    file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
-
-            if fn.type == "mcfunction":
-                file.append(f"function {self.pack_name}:{fn.file_name}")
-
-            if fn.type == "python":
-                fn.function(ctx, fn)
-
-            fn_id = get_expr_id()
-            if fn.returnId != "" and fn.type == "radon":
-                file.append(f"scoreboard players set __returned__ --temp-- 0")
-                file.append(f"function {self.pack_name}:{fn.file_name}")
-
-                # the line after these comments is for the case where you call a function inside a function
-                # example:
-                # function test(): void {
-                #   # "scoreboard players set __returned__ --temp-- 0" runs:
-                #   # __returned__ = 0
-                #   a()
-                #   # __returned__ = 1
-                #   # "scoreboard players set __returned__ --temp-- 0" runs again and:
-                #   # __returned__ = 0
-                #   return
-                # }
-                # function a(): void {
-                #   test()
-                #   return
-                # }
-                if ctx.function:
-                    file.append(f"scoreboard players set __returned__ --temp-- 0")
-
-            if fn.returnId == "":
-                file.append(
-                    f"execute store score {returns}_{fn_id} --temp-- run function {self.pack_name}:{fn.file_name}"
-                )
-            elif returns != "void":
-                file.append(
-                    f"scoreboard players operation {returns}_{fn_id} --temp-- = {fn.returnId} --temp--"
-                )
-            return returns + "_" + str(fn_id) if returns != "void" else "null"
+            return self.run_function(ctx, t)
         raise_syntax_error("Invalid expression", t)
         raise SyntaxError("")
+
+    def run_function(self, ctx: TranspilerContext, t: GroupToken):
+        if not t.func:
+            return "null"
+        file = ctx.file
+        fnFound: FunctionDeclaration | None = None
+        for f in self.functions:
+            if f.file_name == t.func.value:
+                fnFound = f
+                break
+        if not fnFound and t.func.value not in builtin:
+            raise_syntax_error("Undefined function", t)
+            return 0
+        separated = split_tokens(t.children)
+        if not fnFound and t.func.value in builtin:
+            built = builtin[t.func.value]
+            if len(built) == 1 and built[0].type == "python-raw":
+                res = built[0].function(ctx, separated, t)
+                return "null" if built[0].returns == "void" else res
+            self.functions += built
+
+        given_args_types = []
+        given_args_locations = []
+        for index, arg in enumerate(separated):
+            if len(arg) == 1 and arg[0].type in [
+                TokenType.IDENTIFIER,
+                TokenType.SELECTOR_IDENTIFIER,
+            ]:
+                (loc, var_type) = self.__get_var_loc(arg[0], ctx)
+                given_args_types.append(var_type)
+                given_args_locations.append(loc)
+                continue
+            score = self.transpile_expr(arg, ctx)
+            score_type = _get_score_type(score)
+            if isinstance(score, int) or isinstance(score, float):
+                given_args_locations.append(score)
+            else:
+                given_args_locations.append(score + " --temp--")
+            given_args_types.append(score_type)
+
+        given_types = ",".join(given_args_types)
+
+        fn = None
+        for f in self.functions:
+            fn_arg_types = ",".join(arg.type for arg in f.arguments)
+            if fn_arg_types == given_types:
+                fn = f
+                break
+        if fn == None:
+            raise_syntax_error("Invalid arguments", t)
+            raise SyntaxError("")
+
+        returns = fn.returns
+        fn_args = fn.arguments
+
+        for index, arg in enumerate(fn_args):
+            eid = arg.id
+            loc = given_args_locations[index]
+            if isinstance(loc, int) or isinstance(loc, float):
+                val = int(score * FLOAT_PREC) if score_type == "float" else int(score)
+                file.append(f"scoreboard players set {eid} --temp-- {val}")
+            else:
+                file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
+
+        if fn.type == "mcfunction":
+            file.append(f"function {self.pack_name}:{fn.file_name}")
+
+        if fn.type == "python":
+            fn.function(ctx, fn)
+
+        fn_id = get_expr_id()
+        if fn.returnId != "" and fn.type == "radon":
+            file.append(f"scoreboard players set __returned__ --temp-- 0")
+            file.append(f"function {self.pack_name}:{fn.file_name}")
+
+            # the line after these comments is for the case where you call a function inside a function
+            # example:
+            # function test(): void {
+            #   # "scoreboard players set __returned__ --temp-- 0" runs:
+            #   # __returned__ = 0
+            #   a()
+            #   # __returned__ = 1
+            #   # "scoreboard players set __returned__ --temp-- 0" runs again and:
+            #   # __returned__ = 0
+            #   return
+            # }
+            # function a(): void {
+            #   test()
+            #   return
+            # }
+            if ctx.function:
+                file.append(f"scoreboard players set __returned__ --temp-- 0")
+
+        if fn.returnId == "":
+            file.append(
+                f"execute store score {returns}_{fn_id} --temp-- run function {self.pack_name}:{fn.file_name}"
+            )
+        elif returns != "void":
+            file.append(
+                f"scoreboard players operation {returns}_{fn_id} --temp-- = {fn.returnId} --temp--"
+            )
+        return returns + "_" + str(fn_id) if returns != "void" else "null"
 
     def _transpile_expr(
         self, tokens: List[Token], ctx: TranspilerContext
@@ -1021,7 +1016,7 @@ class Transpiler:
 
         return stack[-1]
 
-    def get_expr_loc(self, tokens, ctx: TranspilerContext):
+    def get_expr_loc(self, ctx: TranspilerContext, tokens: List[Token]):
         is_var = len(tokens) == 1 and tokens[0].type in {
             TokenType.IDENTIFIER,
             TokenType.SELECTOR_IDENTIFIER,

@@ -30,7 +30,8 @@ versionDiv.innerText = VERSION;
 
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
-from transpiler import transpile_str, reset_expr_id
+from transpiler import transpile_str
+from utils import reset_expr_id
 
 def main(namespace, code):
     try:

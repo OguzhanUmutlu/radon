@@ -11,11 +11,13 @@ def lib_eval(ctx: TranspilerContext, arguments: List[List[Token]], token: GroupT
         raise_error("Eval error", str(e), token)
 
 
-LIB = FunctionDeclaration(
-    type="python-raw",
-    name="python",
-    returns="void",
-    returnId="null",
-    direct=True,
-    function=lib_eval,
-)
+LIB = [
+    FunctionDeclaration(
+        type="python-raw",
+        name="python",
+        returns="void",
+        returnId="null",
+        direct=True,
+        function=lib_eval,
+    )
+]

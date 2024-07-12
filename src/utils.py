@@ -1,7 +1,20 @@
 from typing import Any, List, Union, Literal
 from enum import Enum
-import os
-import sys
+
+FLOAT_PREC = 1000
+
+_expr_id = 0
+
+
+def reset_expr_id():
+    global _expr_id
+    _expr_id = 0
+
+
+def get_expr_id():
+    global _expr_id
+    _expr_id += 1
+    return _expr_id
 
 
 class TokenType(Enum):
@@ -52,7 +65,12 @@ class VariableDeclaration:
 class FunctionDeclaration:
     def __init__(
         self,
-        type: Union[Literal["radon"], Literal["mcfunction"], Literal["python"], Literal["python-raw"]],
+        type: Union[
+            Literal["radon"],
+            Literal["mcfunction"],
+            Literal["python"],
+            Literal["python-raw"],
+        ],
         name: str,
         returns: str,
         returnId: str,
