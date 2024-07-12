@@ -45,15 +45,21 @@ def show_err(text, code, start, end):
 
 
 def raise_syntax_error(text, token):
-    print("Token: " + str(token))
-    token.end += 1
-    raise_syntax_error_t(text, token.code, token.start, token.end)
+    raise_error("SyntaxError", text, token)
 
 
 def raise_syntax_error_t(text, code, start, end):
-    raise SyntaxError(
-        show_err(f"\n\033[31mSyntaxError: {text}\033[0m", code, start, end)
-    )
+    raise_error_t("SyntaxError", text, code, start, end)
+
+
+def raise_error(error, text, token):
+    print("Token: " + str(token))
+    token.end += 1
+    raise_error_t(error, text, token.code, token.start, token.end)
+
+
+def raise_error_t(error, text, code, start, end):
+    raise SyntaxError(show_err(f"\n\033[31m{error}: {text}\033[0m", code, start, end))
 
 
 def show_warning(text, token):

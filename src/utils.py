@@ -1,4 +1,4 @@
-from typing import List, Union, Literal
+from typing import Any, List, Union, Literal
 from enum import Enum
 import os
 import sys
@@ -52,16 +52,16 @@ class VariableDeclaration:
 class FunctionDeclaration:
     def __init__(
         self,
-        type: Union[Literal["radon"], Literal["mcfunction"], Literal["python"]],
+        type: Union[Literal["radon"], Literal["mcfunction"], Literal["python"], Literal["python-raw"]],
         name: str,
-        file_name: str,
         returns: str,
         returnId: str,
-        arguments: List[FunctionArgument],
+        arguments: List[FunctionArgument] = [],
         direct: bool = False,
         libs: List[str] = [],
         initLibs: List[str] = [],
-        function=None,
+        function: Any = None,
+        file_name: str = "",
     ):
         self.type = type
         self.name = name
@@ -77,7 +77,12 @@ class FunctionDeclaration:
 
 class TranspilerContext:
     def __init__(
-        self, transpiler, file_name, file, function: FunctionDeclaration | None, loop
+        self,
+        transpiler,
+        file_name: str,
+        file: List[str],
+        function: FunctionDeclaration | None,
+        loop,
     ):
         self.transpiler = transpiler
         self.file_name = file_name

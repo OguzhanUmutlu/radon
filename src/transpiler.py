@@ -1,4 +1,5 @@
-from typing import Dict, List, Union
+import stat
+from typing import Any, Dict, List, Union
 import os
 import sys
 from tokenizer import (
@@ -12,31 +13,54 @@ from tokenizer import (
     split_tokens,
     tokenize,
 )
-from dp_ast import ContinueStatement, DefineFunctionStatement, ExecuteMacroStatement, IfFlowStatement, ImportStatement, InlineStatement, IntroduceVariableStatement, LoopStatement, ReturnStatement, ScheduleStatement, Statement, StatementType, COMMANDS, make_expr, parse_str
+from dp_ast import (
+    ContinueStatement,
+    DefineFunctionStatement,
+    ExecuteMacroStatement,
+    IfFlowStatement,
+    ImportStatement,
+    InlineStatement,
+    IntroduceVariableStatement,
+    LoopStatement,
+    ReturnStatement,
+    ScheduleStatement,
+    Statement,
+    StatementType,
+    COMMANDS,
+    make_expr,
+    parse_str,
+)
 from error import raise_syntax_error, raise_syntax_error_t
-from builtin.sqrt import LIB as LIB_SQRT
 from utils import FunctionDeclaration, TranspilerContext, VariableDeclaration, TokenType
+
+VERSION_RADON = "0.0.1"
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
 if sys.argv[0] == "":
     cwd = "/home/pyodide"
 
 
-builtin = {
-    "sqrt": LIB_SQRT
-}
+from builtin.sqrt import LIB as LIB_SQRT
+from builtin.pyeval import LIB as LIB_EVAL
+
+builtin = {"sqrt": LIB_SQRT, "python": LIB_EVAL}
+
 
 _expr_id = 0
+
 
 def reset_expr_id():
     global _expr_id
     _expr_id = 0
 
+
 FLOAT_PREC = 1000
+
 
 def get_lib_contents(path: str):
     with open(cwd + "/" + path, "r") as f:
         return f.read()
+
 
 def get_expr_id():
     global _expr_id
@@ -144,25 +168,33 @@ def _get_score_type(score):
         return "float"
     return "float" if score.startswith("float_") else "int"
 
+
 # expression tokens: int_literal, float_literal, identifier, selector_identifier
+
 
 def transpile_str(code: str):
     (statements, macros) = parse_str(code)
 
     return Transpiler().transpile(statements, macros)
 
+
 class Transpiler:
     def __init__(self):
         self.files = dict()
-        self.pack_name = "pack"
+        self.pack_name = "mypack"
         self.pack_desc = "This is a datapack!"
         self.pack_format = 10
+        self.main_dir = "./"
         self.variables: Dict[str, VariableDeclaration] = dict()
         self.functions: List[FunctionDeclaration] = []
         self.loops = dict()
         self.init_libs = []
+        self.data = dict()
 
     def transpile(self, statements: List[Statement], macros: List):
+        if len(statements) == 0:
+            self.files = {}
+            return self
         self.macros = macros
         loadF = [
             "# Setup #",
@@ -186,7 +218,9 @@ class Transpiler:
         self.variables["null"] = VariableDeclaration("int", True)
         mainFile = []
         self.mainFile = mainFile
-        self._transpile(statements, TranspilerContext(self, "__main__", mainFile, None, None))
+        self._transpile(
+            statements, TranspilerContext(self, "__main__", mainFile, None, None)
+        )
         loadF.append("")
         loadF.append("# Main File #")
         loadF.append("")
@@ -204,7 +238,7 @@ class Transpiler:
                 else:
                     save = str(get_expr_id())
                     path = statement.path.value[1:-1]
-                    self.add_mcfunction_file(save,path)
+                    self.add_mcfunction_file(save, path)
                     self.functions.append(
                         FunctionDeclaration(
                             type="mcfunction",
@@ -212,45 +246,45 @@ class Transpiler:
                             file_name=save,
                             returns="int",
                             returnId="",
-                            arguments=[]
+                            arguments=[],
                         )
                     )
                 continue
             if isinstance(statement, ScheduleStatement):
-                file_name = self._run_safe(
-                    "__schedule__", statement.body, ctx
-                )
+                file_name = self._run_safe("__schedule__", statement.body, ctx)
                 file.append(
-                    f"schedule function $PACK_NAME$:{file_name} {statement.time.value} replace"
+                    f"schedule function {self.pack_name}:{file_name} {statement.time.value} replace"
                 )
                 self._return_safe(ctx)
                 continue
             if statement.type == StatementType.BREAK:
                 if not loop:
-                    raise_syntax_error(
-                        "Cannot use break outside of loop", statement
-                    )
+                    raise_syntax_error("Cannot use break outside of loop", statement)
                 if file is loop["file"]:
                     file.append("return")
                 else:
-                    file.append(f"scoreboard players set {loop["id"]} __break__ 1")
+                    loop_id = loop["id"]
+                    file.append(f"scoreboard players set {loop_id} __break__ 1")
                     file.append(f"return")
                 continue
             if isinstance(statement, ContinueStatement):
                 if not loop:
-                    raise_syntax_error(
-                        "Cannot use continue outside of loop", statement
-                    )
+                    raise_syntax_error("Cannot use continue outside of loop", statement)
                 if file is loop["file"]:
                     file.append(loop["continue"])
                     file.append("return")
                 else:
-                    file.append(f"scoreboard players set {loop["id"]} __continue__ 1")
+                    loop_id = loop["id"]
+                    file.append(f"scoreboard players set {loop_id} __continue__ 1")
                     file.append(f"return")
                 continue
             if isinstance(statement, LoopStatement):
-                file_name = self._run_safe("__loop__", statement.body, TranspilerContext(self, ctx.file_name, file, function,statement))
-                file.append(f"function $PACK_NAME$:{file_name}")
+                file_name = self._run_safe(
+                    "__loop__",
+                    statement.body,
+                    TranspilerContext(self, ctx.file_name, file, function, statement),
+                )
+                file.append(f"function {self.pack_name}:{file_name}")
                 loop_file = self.files[file_name]
                 loop_id = int(file_name.split("/")[-1])
                 loop_file.insert(0, f"scoreboard players set {loop_id} __break__ 0")
@@ -264,12 +298,14 @@ class Transpiler:
                 if not has_if and not has_else:
                     continue
                 resp = self.exec_if(statement.condition, ctx)
-                if isinstance(resp,bool):
+                if isinstance(resp, bool):
                     if resp:
                         if not has_if:
                             continue
                         self._transpile(statement.body, ctx)
-                    elif has_else and statement.elseBody: # I know this is bad, but the linter wants it
+                    elif (
+                        has_else and statement.elseBody
+                    ):  # I know this is bad, but the linter wants it
                         self._transpile(statement.elseBody, ctx)
                     continue
                 (if_cmd, unless_cmd) = resp
@@ -293,23 +329,19 @@ class Transpiler:
 
                 if has_if:
                     if_name = self._run_safe("__if__", statement.body, ctx)
-                    file.append(f"{if_cmd}function $PACK_NAME$:{if_name}")
+                    file.append(f"{if_cmd}function {self.pack_name}:{if_name}")
                     if has_else:
                         file.append("scoreboard players set __if__ --temp-- 0")
                         self.files[if_name].insert(
                             0, "scoreboard players set __if__ --temp-- 1"
                         )
-                        else_name = self._run_safe(
-                            "__else__", statement.elseBody, ctx
-                        )
+                        else_name = self._run_safe("__else__", statement.elseBody, ctx)
                         file.append(
-                            f"execute if score __if__ matches 0..0 run function $PACK_NAME$:{else_name}"
+                            f"execute if score __if__ matches 0..0 run function {self.pack_name}:{else_name}"
                         )
                 else:
-                    else_name = self._run_safe(
-                        "__else__", statement.elseBody, ctx
-                    )
-                    file.append(f"{unless_cmd}function $PACK_NAME$:{else_name}")
+                    else_name = self._run_safe("__else__", statement.elseBody, ctx)
+                    file.append(f"{unless_cmd}function {self.pack_name}:{else_name}")
                 self._return_safe(ctx)
                 continue
             if isinstance(statement, InlineStatement):
@@ -319,18 +351,17 @@ class Transpiler:
                     # Cleaning the return results of the inline expression since they aren't gonna be used
                     cl1 = f"scoreboard players operation {ret} --temp-- = "
                     cl2 = f"execute store result score {ret} --temp-- run "
-                    if file[-1].startswith(cl1):
+                    if len(file) > 0 and file[-1].startswith(cl1):
                         file.pop()
-                    if file[-1].startswith(cl2):
+                    if len(file) > 0 and file[-1].startswith(cl2):
                         file[-1] = file[-1][len(cl2) :]
-                    #if len(file) >= 2 and file[-2].startswith(cl1):  # for x++ and x--, commented it for library functions
-                        #file.pop(-2)
+                    # if len(file) >= 2 and file[-2].startswith(cl1):  # for x++ and x--, commented it for library functions
+                    # file.pop(-2)
                 continue
             if isinstance(statement, DefineFunctionStatement):
                 if function or loop:
                     raise_syntax_error(
-                        "Functions should be declared in the main scope",
-                        statement
+                        "Functions should be declared in the main scope", statement
                     )
                 fn_name = statement.name.value
                 for arg in statement.arguments:
@@ -344,7 +375,7 @@ class Transpiler:
                         if types == fn_types:
                             raise_syntax_error(
                                 "Function with same name and arguments already exists",
-                                statement
+                                statement,
                             )
                 file_name = fn_name + ("" if count == 0 else str(count))
                 fn = FunctionDeclaration(
@@ -353,12 +384,13 @@ class Transpiler:
                     file_name=file_name,
                     returns=statement.returns.value,
                     returnId=statement.returns.value + "_" + str(get_expr_id()),
-                    arguments=statement.arguments
+                    arguments=statement.arguments,
                 )
                 self.functions.append(fn)
                 self.files[file_name] = []
                 self._transpile(
-                    statement.body, TranspilerContext(self, file_name, self.files[file_name], fn, loop)
+                    statement.body,
+                    TranspilerContext(self, file_name, self.files[file_name], fn, loop),
                 )
                 continue
             if isinstance(statement, ReturnStatement):
@@ -372,7 +404,7 @@ class Transpiler:
                 if returns == "void" and len(expr) != 0:
                     raise_syntax_error(
                         f"Function cannot return a value because it has a void return type",
-                        statement
+                        statement,
                     )
                 if returns != "void":
                     score = self.transpile_expr(expr, ctx)
@@ -380,7 +412,7 @@ class Transpiler:
                     if got_returns != returns:
                         raise_syntax_error(
                             f"Function has a return type of {returns}, but a {got_returns} was returned",
-                            statement
+                            statement,
                         )
                     if isinstance(score, int) or isinstance(score, float):
                         ret = (
@@ -403,10 +435,8 @@ class Transpiler:
                 name = statement.name.value
                 type = statement.varType.value
                 if name in self.variables:
-                    raise_syntax_error(
-                        "Variable is already introduced", statement
-                    )
-                self.variables[name] = VariableDeclaration(type,False)
+                    raise_syntax_error("Variable is already introduced", statement)
+                self.variables[name] = VariableDeclaration(type, False)
                 self.files["__load__"].append(
                     f'scoreboard objectives add {name} dummy ""'
                 )
@@ -415,11 +445,9 @@ class Transpiler:
                 )
                 continue
             if isinstance(statement, ExecuteMacroStatement):
-                exec_name = self._run_safe(
-                    "__execute__", statement.body, ctx
-                )
+                exec_name = self._run_safe("__execute__", statement.body, ctx)
                 file.append(
-                    f"execute {statement.command} run function $PACK_NAME$:{exec_name}"
+                    f"execute {statement.command} run function {self.pack_name}:{exec_name}"
                 )
                 self._return_safe(ctx)
                 continue
@@ -431,10 +459,10 @@ class Transpiler:
         file_name = f"{folder_name}/{id}"
         new_file = []
         if isinstance(loop, LoopStatement):
-            cont = f"function $PACK_NAME$:{file_name}"
+            cont = f"function {self.pack_name}:{file_name}"
             stat = loop
             if stat.time:
-                cont = f"schedule function $PACK_NAME$:{file_name} {stat.time.value} replace"
+                cont = f"schedule function {self.pack_name}:{file_name} {stat.time.value} replace"
             loop = {
                 "id": id,
                 "file": new_file,
@@ -443,7 +471,9 @@ class Transpiler:
             }
             self.loops[id] = loop
         self.files[file_name] = new_file
-        self._transpile(statements, TranspilerContext(self, file_name, new_file, ctx.function, loop))
+        self._transpile(
+            statements, TranspilerContext(self, file_name, new_file, ctx.function, loop)
+        )
         return file_name
 
     def _return_safe(self, ctx: TranspilerContext):
@@ -609,7 +639,7 @@ class Transpiler:
         self.files[file_name] = cmd_file
         cmd_file.append("$" + cmd_str)
         file.append(
-            f"execute store result score {eid} --temp-- run function $PACK_NAME$:{file_name} with storage cmd_mem"
+            f"execute store result score {eid} --temp-- run function {self.pack_name}:{file_name} with storage cmd_mem"
         )
         return eid
 
@@ -653,17 +683,30 @@ class Transpiler:
             eid = var_type + "_" + str(id)
             file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
             return eid
-        if isinstance(t,GroupToken) and t.func:
-            fnFound = False
+        if isinstance(t, GroupToken) and t.func:
+            fnFound: FunctionDeclaration | None = None
             for f in self.functions:
                 if f.file_name == t.func.value:
-                    fnFound = True
+                    fnFound = f
                     break
             if not fnFound and t.func.value not in builtin:
                 raise_syntax_error("Undefined function", t)
-            if not fnFound and t.func.value in builtin:
-                self.functions += builtin[t.func.value]["functions"]
+                return 0
             separated = split_tokens(t.children)
+            if not fnFound and t.func.value in builtin:
+                built = builtin[t.func.value]
+                if (
+                    isinstance(built, FunctionDeclaration)
+                    and built.type == "python-raw"
+                ):
+                    built.function(ctx, separated, t)
+                    return (
+                        "null"
+                        if built.returns == "void"
+                        else built.returns + "_" + built.returnId
+                    )
+                self.functions += built if isinstance(built, list) else [built]
+
             given_args_types = []
             given_args_locations = []
             for index, arg in enumerate(separated):
@@ -713,14 +756,17 @@ class Transpiler:
                     file.append(f"scoreboard players set {eid} --temp-- {val}")
                 else:
                     file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
-            
+
             if fn.type == "mcfunction":
-                file.append(f"function $PACK_NAME$:{fn.file_name}")
-            
+                file.append(f"function {self.pack_name}:{fn.file_name}")
+
+            if fn.type == "python":
+                fn.function(ctx, fn)
+
             fn_id = get_expr_id()
             if fn.returnId != "" and fn.type == "radon":
                 file.append(f"scoreboard players set __returned__ --temp-- 0")
-                file.append(f"function $PACK_NAME$:{fn.file_name}")
+                file.append(f"function {self.pack_name}:{fn.file_name}")
 
                 # the line after these comments is for the case where you call a function inside a function
                 # example:
@@ -739,9 +785,11 @@ class Transpiler:
                 # }
                 if ctx.function:
                     file.append(f"scoreboard players set __returned__ --temp-- 0")
-            
+
             if fn.returnId == "":
-                file.append(f"execute store score {returns}_{fn_id} --temp-- run function $PACK_NAME$:{fn.file_name}")
+                file.append(
+                    f"execute store score {returns}_{fn_id} --temp-- run function {self.pack_name}:{fn.file_name}"
+                )
             elif returns != "void":
                 file.append(
                     f"scoreboard players operation {returns}_{fn_id} --temp-- = {fn.returnId} --temp--"
@@ -751,7 +799,7 @@ class Transpiler:
         raise SyntaxError("")
 
     def _transpile_expr(
-        self, tokens: List[Token], ctx:TranspilerContext
+        self, tokens: List[Token], ctx: TranspilerContext
     ) -> Union[Token, str, int, float]:
         if len(tokens) == 0:
             return "null"
@@ -764,14 +812,20 @@ class Transpiler:
                 or t0.type == TokenType.FUNCTION_CALL
             ):
                 return self.__get_expr_type(t0, ctx)
-            if isinstance(t0,GroupToken):
+            if isinstance(t0, GroupToken):
                 return self._transpile_expr(make_expr(t0.children), ctx)
             return t0
         if t0.value in COMMANDS:
             return self.run_cmd(t0.code[t0.start : tokens[-1].end], ctx)
         if tokens[1].value in INC_OP:
-            name = t0.name.value if isinstance(t0,SelectorIdentifierToken) else t0.value
-            score = f"{t0.selector.value} {name}" if isinstance(t0, SelectorIdentifierToken) else name+  " global"
+            name = (
+                t0.name.value if isinstance(t0, SelectorIdentifierToken) else t0.value
+            )
+            score = (
+                f"{t0.selector.value} {name}"
+                if isinstance(t0, SelectorIdentifierToken)
+                else name + " global"
+            )
             if name not in self.variables:
                 raise_syntax_error("Undefined variable", t0)
 
@@ -780,17 +834,13 @@ class Transpiler:
             inc = FLOAT_PREC if var_type == "float" else 1
             id = get_expr_id()
             eid = var_type + "_" + str(id)
-            file.append(
-                f"scoreboard players operation {eid} --temp-- = {score}"
-            )
+            file.append(f"scoreboard players operation {eid} --temp-- = {score}")
             file.append(f"scoreboard players {action} {score} {inc}")
             return eid
         if t0.value in SET_OP:
             t1 = tokens[1]
             name = (
-                t1.name.value
-                if isinstance(t1, SelectorIdentifierToken)
-                else t1.value
+                t1.name.value if isinstance(t1, SelectorIdentifierToken) else t1.value
             )
             target_score = (
                 f"{t1.selector.value} {name}"
@@ -813,11 +863,9 @@ class Transpiler:
                 (loc, var_type) = self.__get_var_loc(expr[0], ctx)
                 if exist_type and exist_type != var_type:
                     raise_syntax_error(
-                        f"Variable was defined to be {exist_type}, got {var_type}",t1
+                        f"Variable was defined to be {exist_type}, got {var_type}", t1
                     )
-                file.append(
-                    f"scoreboard players operation {target_score} = {loc}"
-                )
+                file.append(f"scoreboard players operation {target_score} = {loc}")
                 id = get_expr_id()
                 eid = f"{var_type}_{id}"
                 file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
@@ -825,7 +873,7 @@ class Transpiler:
                     self.files["__load__"].append(
                         f'scoreboard objectives add {name} dummy ""'
                     )
-                    self.variables[name] = VariableDeclaration(var_type,False)
+                    self.variables[name] = VariableDeclaration(var_type, False)
                 return eid
             score = self.transpile_expr(expr, ctx)
             var_type = _get_score_type(score)
@@ -850,7 +898,7 @@ class Transpiler:
             if isinstance(score, int):
                 if t0.value == "=":
                     file.append(f"scoreboard players set {target_score} {score}")
-                elif exist_type: # linter wants this
+                elif exist_type:  # linter wants this
                     file.extend(
                         _compute(
                             target_score,
@@ -865,7 +913,7 @@ class Transpiler:
                     file.append(
                         f"scoreboard players set {target_score} {int(score * FLOAT_PREC)}"
                     )
-                elif exist_type: # linter wants this
+                elif exist_type:  # linter wants this
                     file.extend(
                         _compute(
                             target_score,
@@ -883,7 +931,7 @@ class Transpiler:
                     file.append(
                         f"scoreboard players operation {target_score} = {score} --temp--"
                     )
-                elif exist_type: # linter wants this
+                elif exist_type:  # linter wants this
                     file.extend(
                         _compute(
                             target_score,
@@ -924,19 +972,19 @@ class Transpiler:
                 ri
                 and rl
                 and (
-                    right.type == TokenType.INT_LITERAL # type: ignore
-                    or right.type == TokenType.FLOAT_LITERAL # type: ignore
+                    right.type == TokenType.INT_LITERAL  # type: ignore
+                    or right.type == TokenType.FLOAT_LITERAL  # type: ignore
                 )
                 and (
-                    left.type == TokenType.INT_LITERAL # type: ignore
-                    or left.type == TokenType.FLOAT_LITERAL # type: ignore
+                    left.type == TokenType.INT_LITERAL  # type: ignore
+                    or left.type == TokenType.FLOAT_LITERAL  # type: ignore
                 )
             ):
-                n = str(eval(f"{left.value}{token.value}{right.value}")) # type: ignore
+                n = str(eval(f"{left.value}{token.value}{right.value}"))  # type: ignore
                 type = (
                     TokenType.FLOAT_LITERAL
-                    if right.type == TokenType.FLOAT_LITERAL # type: ignore
-                    or left.type == TokenType.FLOAT_LITERAL # type: ignore
+                    if right.type == TokenType.FLOAT_LITERAL  # type: ignore
+                    or left.type == TokenType.FLOAT_LITERAL  # type: ignore
                     else TokenType.INT_LITERAL
                 )
                 stack.append(Token(n, type, 0, len(n)))
@@ -956,7 +1004,7 @@ class Transpiler:
             elif lt.startswith("float_"):
                 lf = "f"
             if lf[0] != "l":
-                _lt += " --temp--" # type: ignore
+                _lt += " --temp--"  # type: ignore
             rf = "i"
             if isinstance(rt, int):
                 rf = "li"
@@ -965,7 +1013,7 @@ class Transpiler:
             elif rt.startswith("float_"):
                 rf = "f"
             if rf[0] != "l":
-                _rt += " --temp--" # type: ignore
+                _rt += " --temp--"  # type: ignore
 
             file.extend(_compute(_lt, _rt, lf, token.value, rf))
 
@@ -999,7 +1047,7 @@ class Transpiler:
             return self.transpile_expr(r.children, ctx)
         return r
 
-    def exec_if(self, condition, ctx:TranspilerContext):
+    def exec_if(self, condition, ctx: TranspilerContext):
         file = ctx.file
         function = ctx.function
         # [ [ LeftToken[], Operator, RightToken[] ], AndOrOperator, [ LeftToken[], Operator, RightToken[] ], ... ]
@@ -1068,10 +1116,12 @@ class Transpiler:
         self.add_mcfunction_file("__lib__/" + path, f"builtin/{path}.mcfunction")
 
     def add_mcfunction_file(self, save: str, path: str):
-        self.files[save] = get_lib_contents(path).split("\n")
-    
-    def init_lib_file(self,path:str):
+        self.files[save] = (
+            get_lib_contents(path).replace("%PACK_NAME%", self.pack_name).split("\n")
+        )
+
+    def init_lib_file(self, path: str):
         if path not in self.init_libs:
             self.add_lib_file(path)
             self.init_libs.append(path)
-            self.mainFile.append(f"function $PACK_NAME$:{path}")
+            self.mainFile.append(f"function {self.pack_name}:{path}")

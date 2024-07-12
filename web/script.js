@@ -1,6 +1,7 @@
 const namespace = document.getElementById("namespace");
 const code = document.getElementById("code");
 const filesDiv = document.querySelector(".files");
+const versionDiv = document.getElementById("version");
 
 console.log("Loading pyodide.");
 console.time("Loaded pyodide");
@@ -22,6 +23,11 @@ for (const name in radon) {
 
 console.timeEnd("Loaded radon");
 
+const VERSION = pyodide.runPython(`from transpiler import VERSION_RADON
+
+VERSION_RADON`);
+versionDiv.innerText = VERSION;
+
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
 from transpiler import transpile_str, reset_expr_id
@@ -32,7 +38,7 @@ def main(namespace, code):
         transpiler = transpile_str(code)
 
         for filename in transpiler.files:
-            transpiler.files[filename] = "\\n".join(transpiler.files[filename]).replace("$PACK_NAME$", namespace)
+            transpiler.files[filename] = "\\n".join(transpiler.files[filename])
 
         return json.dumps(transpiler.files)
     except SyntaxError as e:
@@ -109,3 +115,22 @@ function updateCode() {
 
 namespace.addEventListener("input", updateCode);
 code.addEventListener("input", updateCode);
+
+function insertCode(textToInsert) {
+    const cursorPosition = code.selectionStart;
+
+    const textBefore = code.value.substring(0, cursorPosition);
+    const textAfter = code.value.substring(cursorPosition, code.value.length);
+
+    code.value = textBefore + textToInsert + textAfter;
+
+    code.selectionStart = cursorPosition + textToInsert.length;
+    code.selectionEnd = code.selectionStart;
+}
+
+code.addEventListener("keydown", e => {
+    if (e.key === "Tab") {
+        e.preventDefault();
+        insertCode("    ");
+    }
+});

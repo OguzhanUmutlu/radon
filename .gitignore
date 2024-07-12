@@ -5,3 +5,6 @@ build
 .vscode
 .stuff
 test.mcfunction
+dist
+nuitka-crash-report.xml
+main.spec
