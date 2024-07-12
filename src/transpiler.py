@@ -39,7 +39,7 @@ from utils import (
     get_expr_id
 )
 
-VERSION_RADON = "0.0.1"
+VERSION_RADON = "0.0.2"
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
 if sys.argv[0] == "":
