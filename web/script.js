@@ -2,11 +2,16 @@ const namespace = document.getElementById("namespace");
 const code = document.getElementById("code");
 const filesDiv = document.querySelector(".files");
 const versionDiv = document.getElementById("version");
+const loading = document.querySelector(".loading");
+
+loading.innerText = "Loading pyodide...";
 
 console.log("Loading pyodide.");
 console.time("Loaded pyodide");
 window.pyodide = await loadPyodide();
 console.timeEnd("Loaded pyodide");
+
+loading.innerText = "Loading radon...";
 
 console.log("Loading radon...");
 console.time("Loaded radon");
@@ -27,6 +32,8 @@ const VERSION = pyodide.runPython(`from utils import VERSION_RADON
 
 VERSION_RADON`);
 versionDiv.innerText = VERSION;
+
+loading.remove()
 
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
