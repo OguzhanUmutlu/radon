@@ -39,7 +39,7 @@ from utils import (
     get_expr_id
 )
 
-VERSION_RADON = "0.0.2"
+VERSION_RADON = "0.0.3"
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
 if sys.argv[0] == "":
@@ -202,12 +202,9 @@ class Transpiler:
             'scoreboard objectives add __continue__ dummy ""',
             "scoreboard players set null --temp-- 0",
             "scoreboard players set FLOAT_PREC --temp-- " + str(FLOAT_PREC),
-            'scoreboard objectives add true dummy ""',
-            'scoreboard objectives add false dummy ""',
-            'scoreboard objectives add null dummy ""',
-            "scoreboard players set !global true 1",
-            "scoreboard players set !global false 0",
-            "scoreboard players set !global null 0",
+            "scoreboard players set true global 1",
+            "scoreboard players set false global 0",
+            "scoreboard players set null global 0",
         ]
         self.files["__load__"] = loadF
         self.variables["false"] = VariableDeclaration("int", True)
