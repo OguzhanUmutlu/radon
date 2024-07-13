@@ -313,6 +313,9 @@ def read_expression(tokens: List[Token], start_index: int):
     index = start_index
     operator_count = 0
     result = []
+    if len(tokens) - 1 < index:
+        return index, result
+
     is_cmd_expr = tokens[index].value in COMMANDS
 
     while index < length:
