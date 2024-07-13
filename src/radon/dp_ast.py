@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-from tokenizer import (
+from .tokenizer import (
     GroupToken,
     Token,
     TokenType,
@@ -11,8 +11,8 @@ from tokenizer import (
     split_tokens,
     tokenize,
 )
-from error import raise_syntax_error
-from utils import FunctionArgument, UniversalStrMixin
+from .error import raise_syntax_error
+from .utils import FunctionArgument, UniversalStrMixin
 
 ENDERS = {
     TokenType.EOL,

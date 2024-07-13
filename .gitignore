@@ -2,6 +2,8 @@ test.cmd
 code.dp
 build
 **/__pycache__
+radon_cli.egg-info
+testing
 .vscode
 .stuff
 test.mcfunction

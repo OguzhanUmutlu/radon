@@ -1,7 +1,7 @@
-from error import raise_error
-from tokenizer import GroupToken, Token
+from ..error import raise_error
+from ..tokenizer import GroupToken, Token
 from typing import List
-from utils import FunctionDeclaration, TranspilerContext
+from ..utils import FunctionDeclaration, TranspilerContext
 
 
 def lib_eval(ctx: TranspilerContext, arguments: List[List[Token]], token: GroupToken):

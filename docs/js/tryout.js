@@ -15,20 +15,12 @@ loading.innerText = "Loading radon...";
 
 console.log("Loading radon...");
 console.time("Loaded radon");
-let radon = await fetch("./radon.zip?v=" + RADON_VERSION);
-radon = await radon.blob();
-radon = await JSZip.loadAsync(radon);
-radon = radon.files;
-
-for (const name in radon) {
-    const file = radon[name];
-    if (file.dir) pyodide.FS.mkdir(name);
-    else pyodide.FS.writeFile(name, await file.async("text"));
-}
-
+await pyodide.loadPackage("micropip");
+const pip = pyodide.pyimport("micropip");
+await pip.install("radonmc");
 console.timeEnd("Loaded radon");
 
-const VERSION = pyodide.runPython(`from utils import VERSION_RADON
+const VERSION = pyodide.runPython(`from radon.utils import VERSION_RADON
 
 VERSION_RADON`);
 versionDiv.innerText = VERSION;
@@ -37,8 +29,8 @@ loading.remove()
 
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
-from transpiler import transpile_str
-from utils import reset_expr_id
+from radon.transpiler import transpile_str
+from radon.utils import reset_expr_id
 
 def main(namespace, code):
     try:

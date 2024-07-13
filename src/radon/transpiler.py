@@ -1,7 +1,7 @@
 from typing import Dict, List, Union
 import os
 import sys
-from tokenizer import (
+from .tokenizer import (
     GroupToken,
     SelectorIdentifierToken,
     Token,
@@ -12,7 +12,7 @@ from tokenizer import (
     split_tokens,
     tokenize,
 )
-from dp_ast import (
+from .dp_ast import (
     ContinueStatement,
     DefineFunctionStatement,
     ExecuteMacroStatement,
@@ -29,14 +29,14 @@ from dp_ast import (
     make_expr,
     parse_str,
 )
-from error import raise_syntax_error, raise_syntax_error_t
-from utils import (
+from .error import raise_syntax_error, raise_syntax_error_t
+from .utils import (
     FunctionDeclaration,
     TranspilerContext,
     VariableDeclaration,
     TokenType,
     FLOAT_PREC,
-    get_expr_id
+    get_expr_id,
 )
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -44,9 +44,9 @@ if sys.argv[0] == "":
     cwd = "/home/pyodide"
 
 
-from builtin.math import LIB as LIB_MATH
-from builtin.pyeval import LIB as LIB_EVAL
-from builtin.time import LIB as LIB_TIME
+from .builtin.math import LIB as LIB_MATH
+from .builtin.pyeval import LIB as LIB_EVAL
+from .builtin.time import LIB as LIB_TIME
 
 builtin = {}
 
@@ -176,8 +176,7 @@ def transpile_str(code: str):
 class Transpiler:
     def __init__(self):
         self.files = dict()
-        self.pack_name = "mypack"
-        self.pack_desc = "This is a datapack!"
+        self.pack_namespace = "mypack"
         self.pack_format = 10
         self.main_dir = "./"
         self.variables: Dict[str, VariableDeclaration] = dict()
@@ -194,10 +193,10 @@ class Transpiler:
         loadF = [
             "# Setup #",
             "",
-            'scoreboard objectives add --temp-- dummy ""',
-            'scoreboard objectives add global dummy ""',
-            'scoreboard objectives add __break__ dummy ""',
-            'scoreboard objectives add __continue__ dummy ""',
+            'scoreboard objectives add --temp-- dummy "--temp--"',
+            'scoreboard objectives add global dummy "global"',
+            'scoreboard objectives add __break__ dummy "__break__"',
+            'scoreboard objectives add __continue__ dummy "__continue__"',
             "scoreboard players set null --temp-- 0",
             "scoreboard players set FLOAT_PREC --temp-- " + str(FLOAT_PREC),
             "scoreboard players set true global 1",
@@ -251,7 +250,7 @@ class Transpiler:
             if isinstance(statement, ScheduleStatement):
                 file_name = self._run_safe("__schedule__", statement.body, ctx)
                 file.append(
-                    f"schedule function {self.pack_name}:{file_name} {statement.time.value} replace"
+                    f"schedule function {self.pack_namespace}:{file_name} {statement.time.value} replace"
                 )
                 self._return_safe(ctx)
                 continue
@@ -282,7 +281,7 @@ class Transpiler:
                     statement.body,
                     TranspilerContext(self, ctx.file_name, file, function, statement),
                 )
-                file.append(f"function {self.pack_name}:{file_name}")
+                file.append(f"function {self.pack_namespace}:{file_name}")
                 loop_file = self.files[file_name]
                 loop_id = int(file_name.split("/")[-1])
                 loop_file.insert(0, f"scoreboard players set {loop_id} __break__ 0")
@@ -327,7 +326,7 @@ class Transpiler:
 
                 if has_if:
                     if_name = self._run_safe("__if__", statement.body, ctx)
-                    file.append(f"{if_cmd}function {self.pack_name}:{if_name}")
+                    file.append(f"{if_cmd}function {self.pack_namespace}:{if_name}")
                     if has_else:
                         file.append("scoreboard players set __if__ --temp-- 0")
                         self.files[if_name].insert(
@@ -335,11 +334,11 @@ class Transpiler:
                         )
                         else_name = self._run_safe("__else__", statement.elseBody, ctx)
                         file.append(
-                            f"execute if score __if__ matches 0..0 run function {self.pack_name}:{else_name}"
+                            f"execute if score __if__ matches 0..0 run function {self.pack_namespace}:{else_name}"
                         )
                 else:
                     else_name = self._run_safe("__else__", statement.elseBody, ctx)
-                    file.append(f"{unless_cmd}function {self.pack_name}:{else_name}")
+                    file.append(f"{unless_cmd}function {self.pack_namespace}:{else_name}")
                 self._return_safe(ctx)
                 continue
             if isinstance(statement, InlineStatement):
@@ -436,7 +435,7 @@ class Transpiler:
                     raise_syntax_error("Variable is already introduced", statement)
                 self.variables[name] = VariableDeclaration(type, False)
                 self.files["__load__"].append(
-                    f'scoreboard objectives add {name} dummy ""'
+                    f'scoreboard objectives add {name} dummy "{name}"'
                 )
                 self.files["__load__"].append(
                     f"scoreboard objectives enable {name} global"
@@ -445,7 +444,7 @@ class Transpiler:
             if isinstance(statement, ExecuteMacroStatement):
                 exec_name = self._run_safe("__execute__", statement.body, ctx)
                 file.append(
-                    f"execute {statement.command} run function {self.pack_name}:{exec_name}"
+                    f"execute {statement.command} run function {self.pack_namespace}:{exec_name}"
                 )
                 self._return_safe(ctx)
                 continue
@@ -457,10 +456,10 @@ class Transpiler:
         file_name = f"{folder_name}/{id}"
         new_file = []
         if isinstance(loop, LoopStatement):
-            cont = f"function {self.pack_name}:{file_name}"
+            cont = f"function {self.pack_namespace}:{file_name}"
             stat = loop
             if stat.time:
-                cont = f"schedule function {self.pack_name}:{file_name} {stat.time.value} replace"
+                cont = f"schedule function {self.pack_namespace}:{file_name} {stat.time.value} replace"
             loop = {
                 "id": id,
                 "file": new_file,
@@ -543,6 +542,8 @@ class Transpiler:
         cmd = " ".join(s[:-1] if s[-1] == "\\" else s for s in cmd.strip().split("\n"))
         while i < len(cmd):
             if cmd[i : i + 3] == "\\$(":
+                if self.pack_format < 18:
+                    raise_syntax_error_t(f"Macros are not supported in the pack format {self.pack_format}. Consider using a version > (17 or 1.20.1 or 23w35a)", cmd, i, i + 3)
                 cmd_str += "$("
                 i += 3
                 continue
@@ -637,7 +638,7 @@ class Transpiler:
         self.files[file_name] = cmd_file
         cmd_file.append("$" + cmd_str)
         file.append(
-            f"execute store result score {eid} --temp-- run function {self.pack_name}:{file_name} with storage cmd_mem"
+            f"execute store result score {eid} --temp-- run function {self.pack_namespace}:{file_name} with storage cmd_mem"
         )
         return eid
 
@@ -750,7 +751,7 @@ class Transpiler:
                 file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
 
         if fn.type == "mcfunction":
-            file.append(f"function {self.pack_name}:{fn.file_name}")
+            file.append(f"function {self.pack_namespace}:{fn.file_name}")
 
         if fn.type == "python":
             fn.function(ctx, fn)
@@ -758,7 +759,7 @@ class Transpiler:
         fn_id = get_expr_id()
         if fn.returnId != "" and fn.type == "radon":
             file.append(f"scoreboard players set __returned__ --temp-- 0")
-            file.append(f"function {self.pack_name}:{fn.file_name}")
+            file.append(f"function {self.pack_namespace}:{fn.file_name}")
 
             # the line after these comments is for the case where you call a function inside a function
             # example:
@@ -780,7 +781,7 @@ class Transpiler:
 
         if fn.returnId == "":
             file.append(
-                f"execute store score {returns}_{fn_id} --temp-- run function {self.pack_name}:{fn.file_name}"
+                f"execute store score {returns}_{fn_id} --temp-- run function {self.pack_namespace}:{fn.file_name}"
             )
         elif returns != "void":
             file.append(
@@ -861,7 +862,7 @@ class Transpiler:
                 file.append(f"scoreboard players operation {eid} --temp-- = {loc}")
                 if name not in self.variables:
                     self.files["__load__"].append(
-                        f'scoreboard objectives add {name} dummy ""'
+                        f'scoreboard objectives add {name} dummy "{name}"'
                     )
                     self.variables[name] = VariableDeclaration(var_type, False)
                 return eid
@@ -934,7 +935,7 @@ class Transpiler:
 
             if name not in self.variables:
                 self.files["__load__"].append(
-                    f'scoreboard objectives add {name} dummy ""'
+                    f'scoreboard objectives add {name} dummy "{name}"'
                 )
 
                 self.variables[name] = VariableDeclaration(var_type, False)
@@ -1107,11 +1108,11 @@ class Transpiler:
 
     def add_mcfunction_file(self, save: str, path: str):
         self.files[save] = (
-            get_lib_contents(path).replace("%PACK_NAME%", self.pack_name).split("\n")
+            get_lib_contents(path).replace("%pack_namespace%", self.pack_namespace).split("\n")
         )
 
     def init_lib_file(self, path: str):
         if path not in self.init_libs:
             self.add_lib_file(path)
             self.init_libs.append(path)
-            self.mainFile.append(f"function {self.pack_name}:{path}")
+            self.mainFile.append(f"function {self.pack_namespace}:{path}")

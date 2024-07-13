@@ -1,7 +1,7 @@
 from typing import List
 
-from error import raise_syntax_error, raise_syntax_error_t
-from utils import TokenType
+from .error import raise_syntax_error, raise_syntax_error_t
+from .utils import TokenType
 
 SET_OP = ["=", "+=", "-=", "*=", "/=", "%="]
 

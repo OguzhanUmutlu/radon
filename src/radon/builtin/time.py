@@ -1,5 +1,5 @@
-from utils import FunctionDeclaration, TranspilerContext
-from utils import FLOAT_PREC
+from ..utils import FunctionDeclaration, TranspilerContext
+from ..utils import FLOAT_PREC
 
 
 def lib_time(ctx: TranspilerContext, _):

@@ -1,7 +1,7 @@
 from typing import List
-from tokenizer import GroupToken, Token
-from utils import get_expr_id
-from utils import FLOAT_PREC, FunctionArgument, FunctionDeclaration, TranspilerContext
+from ..tokenizer import GroupToken, Token
+from ..utils import get_expr_id
+from ..utils import FLOAT_PREC, FunctionArgument, FunctionDeclaration, TranspilerContext
 
 
 def lib_isqrt(ctx: TranspilerContext, _):

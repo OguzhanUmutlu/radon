@@ -8,6 +8,88 @@ _expr_id = 0
 VERSION_RADON = "0.0.3"
 
 
+# Version argument can be: a pack format, a minecraft version like 1.16.5, or a snapshot version like 23w32a
+def get_pack_format(version: str):
+    if version.isnumeric() and (4 <= int(version) <= 18 or version == "48"):
+        return int(version)
+    version = version.split("-")[0]
+    if version[2] == "w":
+        version = version[:-1]
+        spl = version.split("w")
+        v = spl[0]
+        if not v.isnumeric():
+            return None
+        v = int(v)
+        k = spl[1]
+        if not k.isnumeric():
+            return None
+        k = int(k)
+        if v < 17 or (v == 17 and k < 48):
+            return None
+        if v < 20:
+            return 4
+        if v < 21:
+            return 7
+        if v < 22:
+            return 8
+        if v < 23:
+            return 10
+        if v < 24:
+            if k < 6:
+                return 11
+            if k < 12:
+                return 12
+            if k < 16:
+                return 13
+            if k < 18:
+                return 14
+            if k < 31:
+                return 15
+            if k < 32:
+                return 16
+            if k > 35:
+                return None
+            return 17
+        return None
+    spl = version.split(".")
+    if spl[0] != "1" or len(spl) == 1 or len(spl) > 3:
+        return None
+    v = spl[1]
+    if not v.isnumeric():
+        return None
+    v = int(v)
+    k = spl[2] if len(spl) == 3 else "0"
+    if not k.isnumeric():
+        return None
+    k = int(k)
+    if v > 21 or k > 100:
+        return None
+    vk = v * 100 + k
+    if vk < 1300:
+        return None
+    if vk < 1500:
+        return 4
+    if vk < 1602:
+        return 5
+    if vk < 1700:
+        return 6
+    if vk < 1800:
+        return 7
+    if vk < 1802:
+        return 8
+    if vk < 1900:
+        return 9
+    if vk < 1904:
+        return 10
+    if vk < 2000:
+        return 12
+    if vk < 2002:
+        return 15
+    if vk < 2100:
+        return 18
+    return 48
+
+
 def reset_expr_id():
     global _expr_id
     _expr_id = 0
