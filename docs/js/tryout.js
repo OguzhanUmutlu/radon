@@ -17,7 +17,7 @@ console.log("Loading radon...");
 console.time("Loaded radon");
 await pyodide.loadPackage("micropip");
 const pip = pyodide.pyimport("micropip");
-await pip.install("radonmc");
+await pip.install("radonmc", { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
 console.timeEnd("Loaded radon");
 
 const VERSION = pyodide.runPython(`from radon.utils import VERSION_RADON
