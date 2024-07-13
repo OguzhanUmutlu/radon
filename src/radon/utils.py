@@ -5,7 +5,7 @@ FLOAT_PREC = 1000
 
 _expr_id = 0
 
-VERSION_RADON = "0.0.3"
+VERSION_RADON = "0.0.4"
 
 
 # Version argument can be: a pack format, a minecraft version like 1.16.5, or a snapshot version like 23w32a
