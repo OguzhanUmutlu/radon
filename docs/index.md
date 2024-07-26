@@ -2,11 +2,11 @@
 layout: home
 
 title: Radon
-titleTemplate: Next Generation Datapack Coding
+titleTemplate: Next Generation Datapack Development
 
 hero:
   name: Radon
-  text: Next Generation Datapack Coding
+  text: Next Generation Datapack Development
   tagline: Get ready for a development environment that can finally catch up with you.
   image:
     src: ./assets/icon-round.png

@@ -1,6 +1,6 @@
 import { defineConfig } from "vitepress";
 
-const ogDescription = "Next Generation Datapack Coding";
+const ogDescription = "Next Generation Datapack Development";
 const ogImage = "https://oguzhanumutlu.github.io/assets/icon-round.png";
 const ogTitle = "Radon";
 const ogUrl = "https://oguzhanumutlu.github.io";
@@ -9,7 +9,7 @@ const discordLink = "https://discord.gg/xYjXnDp6h3";
 
 export default defineConfig({
     title: `Radon`,
-    description: "Next Generation Datapack Coding",
+    description: "Next Generation Datapack Development",
     ignoreDeadLinks: true,
 
     base: "/radon/",
