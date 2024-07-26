@@ -41,7 +41,6 @@ class CompileTimeValue:
         # type: (TranspilerContext, str, CompileTimeValue) -> CompileTimeValue
         if op == "+":
             res = self._add(ctx, cpl)
-            print(res)
         elif op == "-":
             res = self._sub(ctx, cpl)
         elif op == "*":

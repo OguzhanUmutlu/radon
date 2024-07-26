@@ -1116,7 +1116,7 @@ class Transpiler:
             class_name = cls.name
             ctx.file.append(f"data modify storage class this append {cls.sample.get_data_str(ctx)}")
 
-        given_types = ",".join([str(arg.unique_type) for arg in args])
+        given_types = ", ".join([str(arg.unique_type) for arg in args])
 
         found_fn = None
         available = []
