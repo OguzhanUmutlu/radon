@@ -1010,6 +1010,8 @@ class Transpiler:
             ):
                 raise_syntax_error("Invalid variable name", t0[0])
                 raise ValueError("")
+            if len(chains) < 3:
+                raise_syntax_error("Expected an expression for the assignment", t1[0])
             cpl = self.chains_to_cpl(ctx, chains[2:])
             variable = self._var_to_cpl_or_none(ctx, t0[0])
 

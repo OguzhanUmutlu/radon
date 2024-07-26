@@ -2,7 +2,7 @@
 
 <TryOut />
 
-<script type="module">;
+<script type="module">
 
 const namespace = () => document.getElementById("namespace");
 const code = () => document.getElementById("code");
@@ -55,10 +55,8 @@ from radon.utils import reset_expr_id
 def main(namespace, code):
     try:
         reset_expr_id()
-        transpiler = Transpiler()
-        transpiler.pack_namespace = namespace
-        (statement, macros) = parse_str(code)
-        transpiler.transpile(statement, macros)
+        (statements, macros) = parse_str(code)
+        transpiler = Transpiler(statements, macros, namespace)
 
         for filename in transpiler.files:
             transpiler.files[filename] = "\\n".join(transpiler.files[filename])

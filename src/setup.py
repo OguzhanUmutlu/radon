@@ -6,7 +6,7 @@ setup(
     version=VERSION_RADON,
     packages=find_packages(),
     package_data={
-        "radon": ["builtin/*"],
+        "radon": ["builtin/*", "cpl/*"],
     },
     entry_points={
         "console_scripts": [
