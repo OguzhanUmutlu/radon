@@ -1,0 +1,20 @@
+<template>
+    <h3 id="version">Loading radon...</h3>
+    <br>
+    <link rel="stylesheet" href="../../css/common.css">
+    <link rel="stylesheet" href="../../css/tryout.css">
+    <input id="namespace" placeholder="Namespace..."><br>
+    <textarea id="code" placeholder="Code..."></textarea><br>
+    <div class="files"></div>
+</template>
+
+<style scoped>
+.container>.content {
+    background-color: red;
+    width: 100vw;
+}
+
+#namespace {
+    width: 100%;
+}
+</style>

@@ -9,7 +9,7 @@ hero:
   text: Next Generation Datapack Coding
   tagline: Get ready for a development environment that can finally catch up with you.
   image:
-    src: /assets/icon-round.png
+    src: ./assets/icon-round.png
     alt: Radon
   actions:
     - theme: brand
@@ -28,7 +28,7 @@ features:
     details: With its simplistic nature you will code without delays!
   - icon: 📦
     title: Fast Build
-    details: Blazingly fast builds as fast as 0.01  s!
+    details: Blazingly fast builds as fast as 0.01s!
   - icon: 🪙
     title: Features
     details: Useful out-of-the-box functions!

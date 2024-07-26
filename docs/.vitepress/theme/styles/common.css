@@ -1,18 +1,18 @@
 @font-face {
     font-family: MinecraftTen;
-    src: url("../assets/MinecraftTen.ttf") format("truetype");
+    src: url("../fonts/MinecraftTen.ttf") format("truetype");
     font-weight: normal;
 }
 
 @font-face {
     font-family: MinecraftRegular;
-    src: url("../assets/MinecraftRegular.otf") format("opentype");
+    src: url("../fonts/MinecraftRegular.otf") format("opentype");
     font-weight: normal;
 }
 
 @font-face {
     font-family: MinecraftBold;
-    src: url("../assets/MinecraftBold.otf") format("opentype");
+    src: url("../fonts/MinecraftBold.otf") format("opentype");
     font-weight: bold;
 }
 

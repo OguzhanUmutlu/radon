@@ -9,6 +9,7 @@ test.bat
 dist
 nuitka-crash-report.xml
 main.spec
-docs-src/.vitepress
 node_modules
 venv
+.vitepress/cache
+.vitepress/dist
