@@ -1,0 +1,15 @@
+{
+  "name": "docs-src",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "vitepress"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "vitepress": "^1.3.0"
+  }
+}

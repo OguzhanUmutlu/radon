@@ -1,5 +1,5 @@
 build
-**/__pycache__
+__pycache__
 radonmc.egg-info
 testing
 .vscode
@@ -9,3 +9,6 @@ test.bat
 dist
 nuitka-crash-report.xml
 main.spec
+docs-src/.vitepress
+node_modules
+venv

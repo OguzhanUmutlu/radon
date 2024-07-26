@@ -1,10 +1,18 @@
 from typing import List
-from ..tokenizer import GroupToken, Token
+
+from ..cpl.base import CompileTimeValue
+from ..cpl.float import CplFloat
+from ..cpl.int import CplInt
+from ..cpl.score import CplScore
+from ..tokenizer import GroupToken
+from ..transpiler import FunctionArgument, FunctionDeclaration, TranspilerContext, NULL_VALUE, add_lib
+from ..utils import FLOAT_PREC
 from ..utils import get_expr_id
-from ..utils import FLOAT_PREC, FunctionArgument, FunctionDeclaration, TranspilerContext
+
+_ = 0
 
 
-def lib_isqrt(ctx: TranspilerContext, _):
+def lib_isqrt(ctx: TranspilerContext, _, __):
     tr = ctx.transpiler
     file = ctx.file
     if "has_sqrt_init" not in tr.data:
@@ -17,7 +25,7 @@ def lib_isqrt(ctx: TranspilerContext, _):
             "scoreboard players operation __isqrt__x_4 --temp-- = __isqrt__x --temp--",
             "scoreboard players operation __isqrt__x_4 --temp-- /= __isqrt__4 --temp--",
             "scoreboard players operation __isqrt__output --temp-- = __isqrt__x_4 --temp--",
-            f"function {tr.pack_name}:__lib__/__isqrt__loop",
+            f"function {tr.pack_namespace}:__lib__/__isqrt__loop",
         ]
     )
 
@@ -47,7 +55,7 @@ def lib_isqrt(ctx: TranspilerContext, _):
 # x += x_t
 
 
-def lib_cbrt(ctx: TranspilerContext, _):
+def lib_cbrt(ctx: TranspilerContext, _, __):
     tr = ctx.transpiler
     file = ctx.file
     if "has_cbrt_init" not in tr.data:
@@ -63,7 +71,7 @@ def lib_cbrt(ctx: TranspilerContext, _):
         [
             "scoreboard players operation __cbrt__x --temp-- *= __cbrt__4d3 --temp--",
             "scoreboard players operation __cbrt__output --temp-- = __cbrt__x --temp--",
-            f"function {tr.pack_name}:__lib__/__cbrt__loop",
+            f"function {tr.pack_namespace}:__lib__/__cbrt__loop",
         ]
     )
 
@@ -91,7 +99,7 @@ def lib_cbrt(ctx: TranspilerContext, _):
 # x + a / x
 
 
-def lib_sqrt(ctx: TranspilerContext, _):
+def lib_sqrt(ctx: TranspilerContext, _, __):
     tr = ctx.transpiler
     file = ctx.file
     if "has_sqrt_init" not in tr.data:
@@ -113,7 +121,7 @@ def lib_sqrt(ctx: TranspilerContext, _):
         [
             "scoreboard players operation __sqrt__x --temp-- /= __sqrt__4 --temp--",
             "scoreboard players operation __sqrt__output --temp-- = __sqrt__x --temp--",
-            f"function {tr.pack_name}:__lib__/__sqrt__loop",
+            f"function {tr.pack_namespace}:__lib__/__sqrt__loop",
         ]
     )
 
@@ -129,120 +137,132 @@ def lib_sqrt(ctx: TranspilerContext, _):
     ]
 
 
-def lib_float(ctx: TranspilerContext, _):
+def lib_float(ctx: TranspilerContext, _, __):
     ctx.file.append(
         f"scoreboard players operation float_float --temp-- *= FLOAT_PREC --temp--"
     )
 
 
-def lib_int(ctx: TranspilerContext, _):
+def lib_int(ctx: TranspilerContext, _, __):
     ctx.file.append(
         f"scoreboard players operation int_int --temp-- /= FLOAT_PREC --temp--"
     )
 
 
-def lib_floor(ctx: TranspilerContext, _):
+def lib_floor(ctx: TranspilerContext, _, __):
     ctx.file.append(
         f"scoreboard players operation int_floor --temp-- /= FLOAT_PREC --temp--"
     )
 
 
-def lib_ceil(ctx: TranspilerContext, _):
+def lib_ceil(ctx: TranspilerContext, _, __):
     ctx.file.append(f"scoreboard players add int_ceil --temp-- {int(FLOAT_PREC - 1)}")
     ctx.file.append(
         f"scoreboard players operation int_ceil --temp-- /= FLOAT_PREC --temp--"
     )
 
 
-def lib_round(ctx: TranspilerContext, _):
+def lib_round(ctx: TranspilerContext, _, __):
     ctx.file.append(f"scoreboard players add int_round --temp-- {int(FLOAT_PREC / 2)}")
     ctx.file.append(
         f"scoreboard players operation int_round --temp-- /= FLOAT_PREC --temp--"
     )
 
 
+def _min_max_help(x, y, func_name):
+    return x.value < y.value if func_name == "min" else x.value > y.value
+
+
 def lib_min_max(
-    ctx: TranspilerContext, arguments: List[List[Token]], token: GroupToken
+        ctx: TranspilerContext, arguments: List[CompileTimeValue], token: GroupToken
 ):
     if not token.func:
         return "null"
     func_name = token.func.value
     op = "<" if func_name == "min" else ">"
-    op_func = lambda x, y: x < y if func_name == "min" else x > y
     file = ctx.file
-    minNum = None
-    scores = [ctx.transpiler.transpile_expr(arg, ctx) for arg in arguments]
+    min_num = None
+    scores = [
+        arg if (isinstance(arg, CplScore)
+                or isinstance(arg, CplInt)
+                or isinstance(arg, CplFloat))
+        else arg.cache(ctx, force="score")
+        for arg in arguments]
 
     if len(scores) == 0:
         return "null"
 
-    newScores = []
-    scoreT = "int"
+    new_scores = []
+    score_t = "int"
     for score in scores:
-        if not isinstance(score, str):
-            if minNum is None or op_func(score, minNum):
-                if isinstance(score, float):
-                    scoreT = "float"
-                minNum = score
-        else:
-            if score.startswith("float_"):
-                scoreT = "float"
-            newScores.append(score)
-    lastId = get_expr_id()
-    lastScore = f"{scoreT}_{lastId}"
-    if minNum is not None:
-        if scoreT == "float":
-            minNum = int(FLOAT_PREC * minNum)
-        file.append(f"scoreboard players set {lastScore} --temp-- {minNum}")
-        if len(newScores) == 0:
-            return lastScore
+        if isinstance(score, CplScore):
+            if score.unique_type.type == "float":
+                score_t = "float"
+            new_scores.append(score)
+        elif min_num is None or _min_max_help(score, min_num, func_name):
+            if score.unique_type.type == "float":
+                score_t = "float"
+            min_num = score.value
+    last_id = get_expr_id()
+    last_score = f"{score_t}_{last_id}"
+    if min_num is not None:
+        if score_t == "float":
+            min_num = int(FLOAT_PREC * min_num)
+        file.append(f"scoreboard players set {last_score} --temp-- {min_num}")
+        if len(new_scores) == 0:
+            return last_score
     else:
-        score = newScores.pop(0)
+        score = new_scores.pop(0)
         file.append(
-            f"scoreboard players operation {lastScore} --temp-- = {score} --temp--"
+            f"scoreboard players operation {last_score} --temp-- = {score.location} --temp--"
         )
-        if score.startswith("int_") and scoreT == "float":
+        if score.unique_type.type == "int" and score_t == "float":
             file.append(
-                f"scoreboard players operation {lastScore} --temp-- *= FLOAT_PREC --temp--"
+                f"scoreboard players operation {last_score} --temp-- *= FLOAT_PREC --temp--"
             )
 
-    for score in newScores:
-        if score.startswith("int_") and scoreT == "float":
+    for score in new_scores:
+        if score.unique_type.type == "int" and score_t == "float":
             file.append(
-                f"scoreboard players operation {score} --temp-- *= FLOAT_PREC --temp--"
+                f"scoreboard players operation {score.location} --temp-- *= FLOAT_PREC --temp--"
             )
         file.append(
-            f"execute if score {score} --temp-- {op} {lastScore} --temp-- run scoreboard players operation {lastScore} --temp-- = {score} --temp--"
+            f"execute if score {score.location} --temp-- {op} {last_score} --temp-- "
+            f"run scoreboard players operation {last_score} --temp-- = {score.location} --temp--"
         )
 
-    return lastScore
+    return last_score
 
 
-LIB = []
-
-
-def math_dec(name, args, returns, func, returnId=None):
-    if returnId is None:
-        returnId = f"{returns}_{name}"
-    LIB.append(
+def math_dec(name, args, returns, func, return_loc=None):
+    if returns is None:
+        return_loc = NULL_VALUE
+    elif returns == "int":
+        return_loc = CplScore(None, return_loc or f"int_{name}")
+    else:
+        return_loc = CplScore(None, return_loc or f"float_{name}")
+    add_lib(
         FunctionDeclaration(
-            type="python" if args else "python-raw",
+            type="python" if args else "python-cpl",
             name=name,
-            returns=returns,
-            returnId=returnId,
+            returns=return_loc,
             arguments=(
                 [
                     FunctionArgument(
-                        arg[0] if isinstance(arg, tuple) else arg,
                         "x" + str(index),
-                        arg[1] if isinstance(arg, tuple) else f"{name}_{index}",
+                        CplScore(
+                            None,
+                            (arg[1] if isinstance(arg, tuple) else f"{name}_{index}")
+                            + " --temp--",
+                            arg[0] if isinstance(arg, tuple) else arg,
+                        ),
+                        False
                     )
                     for index, arg in enumerate(args)
                 ]
                 if args
                 else []
             ),
-            direct=True,
             function=func,
         )
     )

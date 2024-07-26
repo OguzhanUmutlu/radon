@@ -1,11 +1,58 @@
-from typing import Any, List, Union, Literal
 from enum import Enum
+from typing import Dict, Union, List, Any
 
 FLOAT_PREC = 1000
+INT_LIMIT = 2147483647
+FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC
 
 _expr_id = 0
 
-VERSION_RADON = "0.0.4"
+VERSION_RADON = "1.0.1"
+
+
+def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> Union[int, float]:
+    if op == "+":
+        return a + b
+    elif op == "-":
+        return a - b
+    elif op == "*":
+        return a * b
+    elif op == "/":
+        return a / b
+    elif op == "%":
+        return a % b
+    else:
+        assert False
+
+
+def basic_cmp(a, op: str, b):
+    if op == ">":
+        return a > b
+    elif op == "<":
+        return a < b
+    elif op == ">=":
+        return a >= b
+    elif op == "<=":
+        return a <= b
+    else:
+        assert False
+
+
+def inv_cmp(op: str):
+    if op == ">":
+        return "<="
+    elif op == "<":
+        return ">="
+    elif op == ">=":
+        return "<"
+    elif op == "<=":
+        return ">"
+    elif op == "==":
+        return "!="
+    elif op == "!=":
+        return "=="
+    else:
+        assert False
 
 
 # Version argument can be: a pack format, a minecraft version like 1.16.5, or a snapshot version like 23w32a
@@ -118,8 +165,7 @@ class TokenType(Enum):
     FUNCTION_CALL = "function_call"
     SELECTOR = "selector"
     SELECTOR_IDENTIFIER = "selector_identifier"
-    STORAGE_NBT_IDENTIFIER = "storage_nbt_identifier"
-    ENTITY_NBT_IDENTIFIER = "entity_nbt_identifier"
+    BLOCK_IDENTIFIER = "block_identifier"
 
     POINTER = "pointer"  # This is not a token type. This is used to point to a part of the user code.
 
@@ -127,67 +173,113 @@ class TokenType(Enum):
 class UniversalStrMixin:
     def __str__(self):
         attributes = [
-            f"{key}={list(map(str,value)) if isinstance(value, list) else value}"
+            f"{key}={list(map(str, value)) if isinstance(value, list) else value}"
             for key, value in filter(lambda x: x[0] != "code", self.__dict__.items())
         ]
         return f"{self.__class__.__name__}({', '.join(attributes)})"
 
 
-class FunctionArgument:
-    def __init__(self, type: str, name: str, id: str = ""):
+class CplDef:
+    def __init__(self, type: str):
         self.type = type
-        self.name = name
-        self.id = id
+
+    def __eq__(self, value: object) -> bool:
+        return str(self) == str(value)
+
+    def get_sample_value(self) -> str:
+        return ""
 
 
 class VariableDeclaration:
-    def __init__(self, type: str, constant: bool):
+    def __init__(self, type: Any, constant: bool):
+        self.value = None
+        if not type.__class__.__name__.startswith("CplDef"):
+            self.value = type
+            type = type.unique_type
         self.type = type
         self.constant = constant
 
 
-class FunctionDeclaration:
-    def __init__(
-        self,
-        type: Union[
-            Literal["radon"],
-            Literal["mcfunction"],
-            Literal["python"],
-            Literal["python-raw"],
-        ],
-        name: str,
-        returns: str,
-        returnId: str,
-        arguments: List[FunctionArgument] = [],
-        direct: bool = False,
-        libs: List[str] = [],
-        initLibs: List[str] = [],
-        function: Any = None,
-        file_name: str = "",
-    ):
-        self.type = type
-        self.name = name
-        self.file_name = file_name
-        self.returns = returns
-        self.returnId = returnId
-        self.arguments = arguments
-        self.direct = direct
-        self.libs = libs
-        self.initLibs = initLibs
-        self.function = function
+class CplDefInt(CplDef):
+    def __init__(self):
+        super().__init__("int")
+
+    def __str__(self) -> str:
+        return "int"
+
+    def get_sample_value(self) -> str:
+        return "0"
 
 
-class TranspilerContext:
-    def __init__(
-        self,
-        transpiler,
-        file_name: str,
-        file: List[str],
-        function: FunctionDeclaration | None,
-        loop,
-    ):
-        self.transpiler = transpiler
-        self.file_name = file_name
-        self.file = file
-        self.function = function
-        self.loop = loop
+class CplDefFloat(CplDef):
+    def __init__(self):
+        super().__init__("float")
+
+    def __str__(self) -> str:
+        return "float"
+
+    def get_sample_value(self) -> str:
+        return "0.0"
+
+
+class CplDefString(CplDef):
+    def __init__(self):
+        super().__init__("string")
+
+    def __str__(self) -> str:
+        return "string"
+
+    def get_sample_value(self) -> str:
+        return "''"
+
+
+class CplDefArray(CplDef):
+    def __init__(self, content: CplDef):
+        super().__init__("array")
+        self.content = content
+
+    def __str__(self) -> str:
+        return str(self.content) + "[]"
+
+    def get_sample_value(self) -> str:
+        return f"[{self.content.get_sample_value()}]"
+
+
+class CplDefTuple(CplDef):
+    def __init__(self, content: List[CplDef]):
+        super().__init__("tuple")
+        self.content = content
+
+    def __str__(self) -> str:
+        return "[" + ", ".join(map(str, self.content)) + "]"
+
+    def get_sample_value(self) -> str:
+        return f"[{', '.join(map(lambda x: x.get_sample_value(), self.content))}]"
+
+
+class CplDefObject(CplDef):
+    def __init__(self, type: Dict[str, CplDef], class_name: Union[str, None]):
+        super().__init__("object")
+        self.content = type
+        self.class_name = class_name
+
+    def __str__(self) -> str:
+        if self.class_name:
+            return self.class_name
+        return (
+                "{"
+                + ", ".join([str(k) + ": " + str(v) for k, v in self.content.items()])
+                + "}"
+        )
+
+    def get_sample_value(self) -> str:
+        return (
+                "{"
+                + ", ".join([k + ": " + self.content[k].get_sample_value() for k in self.content])
+                + "}"
+        )
+
+
+INT_TYPE = CplDefInt()
+FLOAT_TYPE = CplDefFloat()
+STRING_TYPE = CplDefString()

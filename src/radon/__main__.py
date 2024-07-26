@@ -1,14 +1,15 @@
+import json
+import os
+import platform
 import shutil
+import sys
+from os import path
+from time import sleep, time
 from typing import Any
+
+from .dp_ast import parse_str
 from .transpiler import Transpiler
 from .utils import VERSION_RADON, get_pack_format
-from .dp_ast import parse_str
-from os import path
-import os
-import sys
-import json
-from time import sleep, time
-import platform
 
 # get the path that the file is running from
 cwd = os.getcwd()
@@ -81,19 +82,15 @@ def build():
     with open(config["main"], "r") as file:
         code = file.read()
 
-    transpiler = Transpiler()
-    transpiler.pack_namespace = config["name"]
-    transpiler.pack_format = config["format"]
-    transpiler.main_dir = config["main"] + "/../"
-
     try:
         (statements, macros) = parse_str(code)
-
-        transpiler.transpile(statements, macros)
+        transpiler = Transpiler(statements, macros, config["namespace"], config["format"], config["main"] + "/../")
     except SyntaxError as e:
         return str(e)
+    except Exception as e:
+        raise e
 
-    outFolders = (
+    out_folders = (
         config["outFolder"]
         if isinstance(config["outFolder"], list)
         else [config["outFolder"]]
@@ -105,17 +102,17 @@ def build():
         with open(f"{cwd}/radon.lock", "r") as file:
             lock = file.read().strip("\n")
 
-    rmFiles = lock.split("\n") if lock else []
+    rm_files = lock.split("\n") if lock else []
 
-    for outFolder in outFolders:
+    for outFolder in out_folders:
         os.makedirs(outFolder, exist_ok=True)
         if config["useLock"]:
-            for f in rmFiles:
+            for f in rm_files:
                 f = f"{outFolder}/{f}"
                 if path.exists(f) and path.isfile(f):
                     os.remove(f)
-                dir = path.dirname(f)
-                empty_dir_recursive(dir)
+                dr = path.dirname(f)
+                empty_dir_recursive(dr)
         else:
             shutil.rmtree(
                 f"{outFolder}/data/{config['namespace']}/functions", ignore_errors=True
@@ -141,9 +138,9 @@ def build():
                 json.dumps({"values": [f"{config['namespace']}:__load__"]}, indent=4)
             )
 
-        if "tick" in transpiler.functions:
+        if "tick" in transpiler.files:
             with open(
-                f"{outFolder}/data/minecraft/tags/functions/tick.json", "w"
+                    f"{outFolder}/data/minecraft/tags/functions/tick.json", "w"
             ) as file:
                 file.write(
                     json.dumps(
@@ -157,12 +154,13 @@ def build():
             transpiler.files[filename]
         )
 
-    for outFolder in outFolders:
+    for outFolder in out_folders:
         for pt in new_files:
+            fname = pt
             pt = f"{outFolder}/{pt}"
             os.makedirs(pathr(pt + "/../"), exist_ok=True)
             with open(pt, "w") as file:
-                file.write("\n".join(transpiler.files[filename]))
+                file.write("\n".join(new_files[fname]))
 
     if config["useLock"]:
         with open(f"{cwd}/radon.lock", "w") as file:
@@ -199,7 +197,7 @@ def init():
         pack_format = get_pack_format(
             get_input(f"{CYAN}Pack format or Minecraft version: {RESET}")
         )
-        if pack_format == None:
+        if pack_format is None:
             print(
                 f"{RED}Invalid pack format or Minecraft version please try again.{RESET}"
             )
@@ -234,7 +232,7 @@ def init():
 
     if not path.exists(main_file):
         with open(main_file, "w") as file:
-            file.write("say Hello, world!")
+            file.write("print('Hello, world!')")
 
     print(f"{GREEN}Datapack's workplace is ready!{RESET}")
     build_for_watch()
@@ -296,6 +294,11 @@ def check_for_changes():
 
 
 def main():
+    c = """a = [1, 2, 3, 4]
+
+a[0] = 10
+
+"""
     global files_snapshot
     print(f"{YELLOW}Radon v{VERSION_RADON}{RESET}")
     print("")

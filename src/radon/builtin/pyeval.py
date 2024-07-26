@@ -1,23 +1,20 @@
 from ..error import raise_error
-from ..tokenizer import GroupToken, Token
-from typing import List
-from ..utils import FunctionDeclaration, TranspilerContext
+from ..tokenizer import GroupToken
+from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
+
+_ = 0
 
 
-def lib_eval(ctx: TranspilerContext, arguments: List[List[Token]], token: GroupToken):
+def lib_eval(ctx: TranspilerContext, token: GroupToken):
     try:
         eval(token.value[7:-1])
     except Exception as e:
         raise_error("Eval error", str(e), token)
 
 
-LIB = [
-    FunctionDeclaration(
-        type="python-raw",
-        name="python",
-        returns="void",
-        returnId="null",
-        direct=True,
-        function=lib_eval,
-    )
-]
+add_lib(FunctionDeclaration(
+    type="python-raw",
+    name="python",
+    returns="void",
+    function=lib_eval,
+))

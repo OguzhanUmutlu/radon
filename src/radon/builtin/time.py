@@ -1,5 +1,8 @@
-from ..utils import FunctionDeclaration, TranspilerContext
+from ..cpl.score import CplScore
+from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import FLOAT_PREC
+
+_ = 0
 
 
 def lib_time(ctx: TranspilerContext, _):
@@ -19,23 +22,18 @@ def lib_ftime(ctx: TranspilerContext, _):
     )
 
 
-LIB = [
-    FunctionDeclaration(
-        type="python",
-        name="time",
-        returns="int",
-        returnId="__time__time__",
-        arguments=[],
-        direct=True,
-        function=lib_time,
-    ),
-    FunctionDeclaration(
-        type="python",
-        name="ftime",
-        returns="float",
-        returnId="__ftime__time__",
-        arguments=[],
-        direct=True,
-        function=lib_ftime,
-    ),
-]
+add_lib(FunctionDeclaration(
+    type="python",
+    name="time",
+    returns=CplScore(None, "__time__time__ --temp-", "int"),
+    arguments=[],
+    function=lib_time,
+))
+
+add_lib(FunctionDeclaration(
+    type="python",
+    name="ftime",
+    returns=CplScore(None, "__ftime__time__ --temp-", "float"),
+    arguments=[],
+    function=lib_ftime,
+))

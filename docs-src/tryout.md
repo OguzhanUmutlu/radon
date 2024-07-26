@@ -1,41 +1,64 @@
-const namespace = document.getElementById("namespace");
-const code = document.getElementById("code");
-const filesDiv = document.querySelector(".files");
-const versionDiv = document.getElementById("version");
-const loading = document.querySelector(".loading");
+# Try Out
 
-loading.innerText = "Loading pyodide...";
+<TryOut />
 
-console.log("Loading pyodide.");
-console.time("Loaded pyodide");
-window.pyodide = await loadPyodide();
-console.timeEnd("Loaded pyodide");
+<script type="module">;
 
-loading.innerText = "Loading radon...";
+const namespace = () => document.getElementById("namespace");
+const code = () => document.getElementById("code");
+const filesDiv = () => document.querySelector(".files");
+const versionDiv = () => document.getElementById("version");
 
-console.log("Loading radon...");
-console.time("Loaded radon");
-await pyodide.loadPackage("micropip");
-const pip = pyodide.pyimport("micropip");
-await pip.install("radonmc", { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
-console.timeEnd("Loaded radon");
+async function waitLoad() {
+    if (!versionDiv()) return await new Promise(resolve => setTimeout(() => waitLoad().then(resolve), 100));
+}
 
-const VERSION = pyodide.runPython(`from radon.utils import VERSION_RADON
+async function main() {
+    if (!window.pyodide) {
+        console.log("Loading pyodide.");
+        console.time("Loaded pyodide");
+        window.pyodide = await loadPyodide();
+        console.timeEnd("Loaded pyodide");
+    }
 
+    if (!pyodide.loadedPackages.radonmc) {
+        console.log("Loading radon...");
+        console.time("Loaded radon");
+        if (!pyodide.loadedPackages.micropip) await pyodide.loadPackage("micropip");
+        const pip = pyodide.pyimport("micropip");
+        await pip.install("radonmc", { headers: { pragma: "no-cache", "cache-control": "no-cache" } });
+        console.timeEnd("Loaded radon");
+    }
+
+    await waitLoad();
+
+    const VERSION = pyodide.runPython(`from radon.utils import VERSION_RADON
 VERSION_RADON`);
-versionDiv.innerText = VERSION;
+    versionDiv().innerText = "Radon v" + VERSION;
 
-loading.remove()
+    namespace().addEventListener("input", updateCode);
+    code().addEventListener("input", updateCode);
+    code().addEventListener("keydown", e => {
+        if (e.key === "Tab") {
+            e.preventDefault();
+            insertCode("    ");
+        }
+    });
+}
 
 function transpile(namespace, code) {
     return pyodide.runPython(`import json
-from radon.transpiler import transpile_str
+from radon.transpiler import Transpiler
+from radon.dp_ast import parse_str
 from radon.utils import reset_expr_id
 
 def main(namespace, code):
     try:
         reset_expr_id()
-        transpiler = transpile_str(code)
+        transpiler = Transpiler()
+        transpiler.pack_namespace = namespace
+        (statement, macros) = parse_str(code)
+        transpiler.transpile(statement, macros)
 
         for filename in transpiler.files:
             transpiler.files[filename] = "\\n".join(transpiler.files[filename])
@@ -48,16 +71,16 @@ main`)(namespace, code);
 }
 
 function updateCode() {
-    code.style.height = "auto";
-    code.style.height = code.scrollHeight + "px";
+    code().style.height = "auto";
+    code().style.height = code.scrollHeight + "px";
 
-    for (const child of [...filesDiv.children]) {
-        filesDiv.removeChild(child);
+    for (const child of [...filesDiv().children]) {
+        filesDiv().removeChild(child);
     }
 
-    if (!code.value.trim()) return;
+    if (!code().value.trim()) return;
 
-    let transpiled = transpile(namespace.value || "namespace", code.value);
+    let transpiled = transpile(namespace().value || "namespace", code().value);
 
     if (transpiled[0] != "{") {
         transpiled = transpiled.split(/(\x1b\[31m)|(\x1b\[4m)|(\x1b\[0m)/).filter(i => i);
@@ -88,7 +111,7 @@ function updateCode() {
 
             error.appendChild(span);
         }
-        filesDiv.appendChild(error);
+        filesDiv().appendChild(error);
         return;
     }
 
@@ -105,16 +128,13 @@ function updateCode() {
         file.appendChild(name);
 
         const content = document.createElement("div");
-        content.classList.add("content");
+        content.classList.add("file-content");
         content.innerText = text;
         file.appendChild(content);
 
-        filesDiv.appendChild(file);
+        filesDiv().appendChild(file);
     }
 }
-
-namespace.addEventListener("input", updateCode);
-code.addEventListener("input", updateCode);
 
 function insertCode(textToInsert) {
     const cursorPosition = code.selectionStart;
@@ -128,9 +148,7 @@ function insertCode(textToInsert) {
     code.selectionEnd = code.selectionStart;
 }
 
-code.addEventListener("keydown", e => {
-    if (e.key === "Tab") {
-        e.preventDefault();
-        insertCode("    ");
-    }
-});
+if (typeof document != "undefined") {
+    eval(`import("https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js")`).then(main);
+}
+</script>

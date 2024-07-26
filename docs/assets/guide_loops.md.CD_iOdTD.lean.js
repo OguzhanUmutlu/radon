@@ -1,0 +1,1 @@
+import{_ as s,c as i,o as a,a4 as e}from"./chunks/framework.DzjGgv20.js";const g=JSON.parse('{"title":"Loops","description":"","frontmatter":{},"headers":[],"relativePath":"guide/loops.md","filePath":"guide/loops.md"}'),t={name:"guide/loops.md"},n=e("",27),l=[n];function p(h,o,k,d,r,c){return a(),i("div",null,l)}const u=s(t,[["render",p]]);export{g as __pageData,u as default};

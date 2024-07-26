@@ -1,7 +1,6 @@
-from typing import List
+from typing import Any, Dict, List
 
 from .error import raise_syntax_error, raise_syntax_error_t
-from .utils import TokenType
 
 SET_OP = ["=", "+=", "-=", "*=", "/=", "%="]
 
@@ -41,7 +40,7 @@ WORD_OPERATORS = ["is not", "is", "and", "or"]
 INC_OP = ["++", "--"]
 CMP_OP = ["==", "!=", ">", "<", ">=", "<=", "is", "is not"]
 CMP_COMBINE_OP = ["&&", "||", "and", "or"]
-SYMBOL = list("}]){[(:,@\\")
+SYMBOL = list("}]){[(:,@\\.~^")
 QUOTES = list("\"'")
 WHITESPACE = list(" \t\v")
 EOL_CHAR = "\n"
@@ -50,6 +49,7 @@ NON_WORD_CHARACTERS = OPERATORS + QUOTES + WHITESPACE + SYMBOL + [EOL_CHAR, EOE_
 
 KEYWORDS = [
     "if",
+    "unless",
     "else",
     "elif",
     "for",
@@ -75,7 +75,7 @@ CLOSE_MATCH = {"}": "{", "]": "[", ")": "("}
 
 
 class Token:
-    def __init__(self, code: str, type: TokenType, start: int, end: int):
+    def __init__(self, code: str, type: Any, start: int, end: int):
         self.code = code
         self.type = type
         self.start = start
@@ -84,12 +84,22 @@ class Token:
         self.update_value()
 
     def update_value(self):
-        self.value = self.code[self.start : self.end]
+        self.value = self.code[self.start: self.end]
         return self.value
 
     def __str__(self) -> str:
         return f"Token(type={self.type}, start={self.start}, end={self.end}, value={self.value})"
 
+
+from .utils import (
+    FLOAT_TYPE,
+    INT_TYPE,
+    STRING_TYPE,
+    CplDef,
+    CplDefArray,
+    CplDefObject,
+    TokenType,
+)
 
 EmptyToken = Token("", TokenType.SYMBOL, 0, 0)
 
@@ -102,6 +112,7 @@ class GroupToken(Token):
         self.open: Token = EmptyToken
         self.close: Token = EmptyToken
         self.func: Token | None = None
+        self._temp: Any = None
 
 
 EmptyGroup: GroupToken = Token("", TokenType.GROUP, 0, 0)  # type: ignore
@@ -109,7 +120,13 @@ EmptyGroup: GroupToken = Token("", TokenType.GROUP, 0, 0)  # type: ignore
 
 class SelectorIdentifierToken(Token):
     def __init__(
-        self, code: str, start: int, end: int, selector: Token, sep: Token, name: Token
+            self,
+            code: str,
+            start: int,
+            end: int,
+            selector: Token,
+            sep: Token,
+            name: Token,
     ):
         super().__init__(code, TokenType.SELECTOR_IDENTIFIER, start, end)
         self.selector = selector
@@ -117,7 +134,73 @@ class SelectorIdentifierToken(Token):
         self.name = name
 
 
-def split_tokens(tokens: List[Token], sep=","):
+class BlockIdentifierToken(Token):
+    def __init__(
+            self,
+            code: str,
+            start: int,
+            end: int,
+            block: GroupToken,
+            sep: Token,
+            name: Token,
+    ):
+        super().__init__(code, TokenType.BLOCK_IDENTIFIER, start, end)
+        self.block = block
+        self.sep = sep
+        self.name = name
+
+
+def cpl_def_from_tokens(classes, tokens):
+    # type: (Dict[str, Any] | List[str], List[Token]) -> CplDef | None
+    """
+    Valid type examples:
+    int
+    float
+    string
+    int[]
+    string[][][]
+    {"a": int, "b": float}
+    """
+    if len(tokens) == 0:
+        return None
+    type = None
+    t0 = tokens[0]
+    if t0.value == "int":
+        type = INT_TYPE
+    if t0.value == "float":
+        type = FLOAT_TYPE
+    if t0.value == "string":
+        type = STRING_TYPE
+    if isinstance(t0, GroupToken) and t0.open.value == "{":
+        dct = {}
+        spl = split_tokens(t0.children)
+        for part in spl:
+            if (
+                    len(part) < 3
+                    or part[0].type not in {TokenType.STRING_LITERAL, TokenType.IDENTIFIER}
+                    or part[1].value != ":"
+            ):
+                return None
+            k = part[0].value
+            if part[0].type == TokenType.STRING_LITERAL:
+                k = k[1:-1]
+            dct[k] = cpl_def_from_tokens(classes, part[2:])
+        type = CplDefObject(dct, None)
+    if not type:
+        if t0.type == TokenType.IDENTIFIER:
+            if t0.value not in classes:
+                return None
+            type = classes[t0.value].attributes.unique_type if isinstance(classes, dict) else CplDefObject({}, t0.value)
+        else:
+            return None
+    for t in tokens[1:]:
+        if not isinstance(t, GroupToken) or t.open.value != "[" or len(t.children) != 0:
+            return None
+        type = CplDefArray(type)
+    return type
+
+
+def split_tokens(tokens: List[Token], sep=",", comma_errors=True) -> List[List[Token]]:
     ind = 0
     parts = [[]]
     while True:
@@ -125,16 +208,16 @@ def split_tokens(tokens: List[Token], sep=","):
             break
         token = tokens[ind]
         if token.value == sep:
-            if len(parts[-1]) == 0:
-                raise_syntax_error("Unexpected comma", token)
+            if comma_errors and len(parts[-1]) == 0:
+                raise_syntax_error(f"Unexpected '{sep}'", token)
             parts.append([])
         else:
             parts[-1].append(token)
         ind += 1
 
-    if len(parts[-1]) == 0:
+    if comma_errors and len(parts[-1]) == 0:
         if len(parts) != 1:
-            raise_syntax_error("Unexpected comma", tokens[-1])
+            raise_syntax_error(f"Unexpected '{sep}'", tokens[-1])
         parts.pop()
 
     return parts
@@ -162,31 +245,26 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
 
             # @r[...something]
             is_selector = (
-                token.value == "["
-                and index != 0
-                and lc != 0
-                and (
-                    pc[-1].type == TokenType.SELECTOR
-                    or pc[-1].type == TokenType.SELECTOR_IDENTIFIER
-                )
-                and len(
-                    (
-                        pc[-1].selector
-                        if isinstance(pc[-1], SelectorIdentifierToken)
-                        else pc[-1]
-                    ).value
-                )
-                == 2  # has to be a short selector like @a, @r
+                    token.value == "["
+                    and index != 0
+                    and lc != 0
+                    and (
+                            pc[-1].type == TokenType.SELECTOR
+                            or pc[-1].type == TokenType.SELECTOR_IDENTIFIER
+                    )
+                    and len(pc[-1].selector.value
+                            if isinstance(pc[-1], SelectorIdentifierToken)
+                            else "") == 2  # has to be a short selector like @a, @r
             )
 
             # func(arguments...)
             if (
-                not is_selector
-                and token.value == "("
-                and index != 0
-                and lc != 0
-                and pc[-1].type == TokenType.IDENTIFIER
-                and pc[-1].value[0] not in list("0123456789.")
+                    not is_selector
+                    and token.value == "("
+                    and index != 0
+                    and lc != 0
+                    and pc[-1].type == TokenType.IDENTIFIER
+                    and pc[-1].value[0] not in list("0123456789.")
             ):
                 func = tokens[index - 1]
                 pc.pop()
@@ -204,25 +282,51 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
                     else TokenType.SELECTOR_IDENTIFIER
                 )
 
-            if func != None:
+            if func is not None:
                 tok.type = TokenType.FUNCTION_CALL
                 tok.func = func
                 tok.start = func.start
 
-            if not is_selector:
+            is_block_identifier = (
+                    token.value == "["
+                    and len(pc) > 1
+                    and pc[-1].value == ":"
+                    and pc[-2].type == TokenType.IDENTIFIER
+            )
+
+            if is_block_identifier:
+                tok._temp = "block"
+
+            if not is_selector and not is_block_identifier:
                 pc.append(tok)
             parent = tok
             continue
         if token.type == TokenType.SYMBOL and token.value in CLOSE_GROUP:
-            if parent.parent == None or parent.open.value != CLOSE_MATCH[token.value]:
+            if parent.parent is None or parent.open.value != CLOSE_MATCH[token.value]:
                 raise_syntax_error("Unexpected parentheses", token)
             parent.close = token
             parent.end = token.end
             parent.update_value()
+
+            if parent._temp == "block":
+                ppc = parent.parent.children
+                colon = ppc.pop()
+                ident = ppc.pop()
+                parent.parent.children.append(
+                    BlockIdentifierToken(
+                        parent.code,
+                        ident.start,
+                        parent.end,
+                        parent,
+                        colon,
+                        ident,
+                    )
+                )
+
             merge = None
             if (
-                parent.type == TokenType.SELECTOR
-                or parent.type == TokenType.SELECTOR_IDENTIFIER
+                    parent.type == TokenType.SELECTOR
+                    or parent.type == TokenType.SELECTOR_IDENTIFIER
             ):
                 merge = parent.parent.children[-1]
                 merge.end = parent.end
@@ -242,7 +346,7 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
 
 
 def _tokenize_iterate(
-    code: str, tokens: List[Token], macros: List, index: List[int], can_macro: bool
+        code: str, tokens: List[Token], macros: List, index: List[int], can_macro: bool
 ):
     char = code[index[0]]
     if char == EOE_CHAR:
@@ -255,15 +359,15 @@ def _tokenize_iterate(
         tokens.append(Token(code, TokenType.EOL, index[0], index[0] + 1))
         return
     if (
-        char == "@"
-        and index[0] != len(code) - 1
-        and code[index[0] + 1] in list("praens")
+            char == "@"
+            and index[0] != len(code) - 1
+            and code[index[0] + 1] in list("praens")
     ):
         selToken = Token(code, TokenType.SELECTOR, index[0], index[0] + 2)
         if (
-            len(tokens) > 1
-            and tokens[-1].value == ":"
-            and tokens[-2].type == TokenType.IDENTIFIER
+                len(tokens) > 1
+                and tokens[-1].value == ":"
+                and tokens[-2].type == TokenType.IDENTIFIER
         ):
             token = SelectorIdentifierToken(
                 code,
@@ -281,8 +385,8 @@ def _tokenize_iterate(
         tokens.append(selToken)
         index[0] += 1
         return
-    if code[index[0] : index[0] + 8] == "#define " and (
-        len(tokens) == 0 or tokens[-1].type == TokenType.EOL
+    if code[index[0]: index[0] + 8] == "#define " and (
+            len(tokens) == 0 or tokens[-1].type == TokenType.EOL
     ):
         if not can_macro:
             raise_syntax_error_t("Unexpected #define", code, index[0], index[0] + 8)
@@ -292,7 +396,7 @@ def _tokenize_iterate(
                 break
             index[0] += 1
         index[0] -= 1
-        m = code[si : index[0] + 1].split(" ")
+        m = code[si: index[0] + 1].split(" ")
         macros.append([m[0], _tokenize(" ".join(m[1:]), False)[0][:-1]])
         return
     if char == ":" and index[0] != len(code) - 1 and code[index[0] + 1] == ":":
@@ -302,9 +406,12 @@ def _tokenize_iterate(
     if char in SYMBOL:
         tokens.append(Token(code, TokenType.SYMBOL, index[0], index[0] + 1))
         return
-    if char == "/" and index[0] != len(code) - 1 and code[index[0] + 1] == "/":
+    if (char == "#") or (
+            char == "/" and index[0] != len(code) - 1 and code[index[0] + 1] == "/"
+    ):
         while index[0] < len(code):
             if code[index[0]] == "\n":
+                index[0] -= 1
                 break
             index[0] += 1
         return
@@ -314,9 +421,9 @@ def _tokenize_iterate(
             if code[index[0]] == "\n":
                 line_index = index[0]
             if (
-                code[index[0]] == "*"
-                and index[0] + 1 < len(code)
-                and code[index[0] + 1] == "/"
+                    code[index[0]] == "*"
+                    and index[0] + 1 < len(code)
+                    and code[index[0] + 1] == "/"
             ):
                 index[0] += 1
                 if line_index != 0:
@@ -328,27 +435,8 @@ def _tokenize_iterate(
         return
 
     for op in OPERATORS_L:
-        if code[index[0] : index[0] + len(op) + (op in WORD_OPERATORS)] == op:
-            token = Token(code, TokenType.OPERATOR, index[0], index[0] + len(op))
-            if op in INC_OP:
-                if len(tokens) == 0 or (
-                    tokens[-1].type != TokenType.IDENTIFIER
-                    and tokens[-1].type != TokenType.SELECTOR_IDENTIFIER
-                ):
-                    raise_syntax_error_t(
-                        "Expected an identifier before the " + op + " token",
-                        code,
-                        index[0],
-                        index[0] + len(op),
-                    )
-                ident = tokens.pop()
-                group = GroupToken(code, ident.start, index[0] + len(op))
-                group.children = [ident, token]
-                group.open = Token("(", TokenType.SYMBOL, 0, 1)
-                group.close = Token(")", TokenType.SYMBOL, 0, 1)
-                tokens.append(group)
-            else:
-                tokens.append(token)
+        if code[index[0]: index[0] + len(op) + (op in WORD_OPERATORS)] == op:
+            tokens.append(Token(code, TokenType.OPERATOR, index[0], index[0] + len(op)))
             index[0] += len(op) - 1
             return
     if char in OPERATORS:
@@ -371,7 +459,7 @@ def _tokenize_iterate(
             raise_syntax_error_t(
                 "Unterminated string", code, startIndex, startIndex + 1
             )
-        value = code[startIndex + 1 : index[0]]
+        value = code[startIndex + 1: index[0]]
         token: Token = Token(code, TokenType.STRING_LITERAL, startIndex, index[0] + 1)
         tokens.append(token)
         return
@@ -385,23 +473,33 @@ def _tokenize_iterate(
         index[0] += 1
     if index[0] == len(code):
         index[0] -= 1
-    value = code[startIndex : index[0] + 1]
+    value = code[startIndex: index[0] + 1]
     type = TokenType.IDENTIFIER
     if value in KEYWORDS:
         type = TokenType.KEYWORD
     elif str.isnumeric(value):
         type = TokenType.INT_LITERAL
-    elif is_float(value):
-        type = TokenType.FLOAT_LITERAL
-    elif type == TokenType.IDENTIFIER and len(tokens) > 0 and tokens[-1].value == "::":
-        type = TokenType.STORAGE_NBT_IDENTIFIER
-        startIndex = tokens[-1].start
-        tokens.pop()
-    if value not in KEYWORDS and len(tokens) > 0 and tokens[-1].value == "-":
+    if value not in KEYWORDS and len(tokens) > 0 and tokens[-1].value == "-" and (
+            len(tokens) == 1 or tokens[-2].type in {TokenType.OPERATOR, TokenType.SYMBOL}):
         tokens.pop()
         startIndex -= 1
-    token = Token(code, type, startIndex, index[0] + 1)
-    tokens.append(token)
+    if (
+            type == TokenType.INT_LITERAL
+            and len(tokens) > 0
+            and tokens[-1].value == "."
+            and tokens[-1].end == startIndex
+            and (
+            len(tokens) == 1
+            or tokens[-2].end != startIndex - 1
+            or tokens[-2].type == TokenType.INT_LITERAL
+    )
+    ):
+        if len(tokens) > 1 and tokens[-2].type == TokenType.INT_LITERAL:
+            tokens.pop()
+        start = tokens.pop().start
+        tokens.append(Token(code, TokenType.FLOAT_LITERAL, start, index[0] + 1))
+        return True
+    tokens.append(Token(code, type, startIndex, index[0] + 1))
 
 
 def _tokenize(code: str, can_macro=True):
@@ -417,7 +515,7 @@ def _tokenize(code: str, can_macro=True):
         index[0] += 1
 
     tokens.append(Token(code, TokenType.EOF, length, length))
-    return (tokens, macros)
+    return tokens, macros
 
 
 def apply_macros(tokens: List[Token], macros: List):
@@ -436,4 +534,5 @@ def apply_macros(tokens: List[Token], macros: List):
 
 def tokenize(code: str):
     (tokens, macros) = _tokenize(code)
-    return (group_tokens(apply_macros(tokens, macros)), macros)
+    new_tokens = group_tokens(apply_macros(tokens, macros))
+    return new_tokens, macros
