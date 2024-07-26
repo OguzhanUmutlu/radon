@@ -77,4 +77,4 @@ from .score import CplScore
 from .string import CplString
 from ._number import make_num
 
-make_num(CplInt)
+make_num(CplFloat)
