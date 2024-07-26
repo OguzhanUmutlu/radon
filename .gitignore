@@ -11,5 +11,5 @@ nuitka-crash-report.xml
 main.spec
 node_modules
 venv
-.vitepress/cache
-.vitepress/dist
+docs/.vitepress/cache
+docs/.vitepress/dist

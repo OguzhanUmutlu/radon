@@ -1,6 +1,8 @@
-<h1 style="display:flex;align-items:center"><img src="https://github.com/OguzhanUmutlu/radon/blob/main/assets/icon.png" style="border-radius:3px; width: 50px">&nbsp;Radon</h1>
+<h1 style="display:flex;align-items:center"><img src="https://github.com/OguzhanUmutlu/radon/blob/main/assets/icon.png">&nbsp;Radon</h1>
 
 Radon is a programming language that gets compiled to Minecraft: Java Edition's mcfunction files.
+
+![Radon code](./assets/code.png)
 
 ## Usage
 
