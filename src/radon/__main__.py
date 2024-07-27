@@ -146,7 +146,7 @@ def build():
             ) as file:
                 file.write(
                     json.dumps(
-                        {"values": [f"{config['namespace']}:__tick__"]}, indent=4
+                        {"values": [f"{config['namespace']}:tick"]}, indent=4
                     )
                 )
 
