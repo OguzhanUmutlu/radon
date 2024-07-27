@@ -45,13 +45,65 @@ def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
         "scoreboard players operation __sqrt__output_change --temp-- -= __sqrt__output --temp--",
         "execute unless score __sqrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__sqrt__loop",
     ]
-    return CplScore(token, "__sqrt__output", "float")
+
+    return CplScore(token, "__sqrt__output --temp--", "float")
+
+
+def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+    tr = ctx.transpiler
+    if len(args) != 1:
+        raise_syntax_error("Expected 1 argument for cbrt()", token)
+    n = args[0]
+    if n.unique_type.type not in {"int", "float"}:
+        raise_syntax_error("Expected an int or float argument for cbrt()", token)
+    if isinstance(n, CplInt) or isinstance(n, CplFloat):
+        return CplFloat(token, sqrt(float(n.value)))
+    n.cache(ctx, score_loc="__cbrt__x", force="score")
+
+    if "has_cbrt_init" not in tr.data:
+        tr.data["has_cbrt_init"] = True
+        tr.files["__load__"].append(
+            f"scoreboard players set __cbrt__3d2 --temp-- {int(FLOAT_PREC * 3 / 2)}"
+        )
+        tr.files["__load__"].append(
+            f"scoreboard players set __cbrt__4d3 --temp-- {int(FLOAT_PREC * 4 / 3)}"
+        )
+
+    ctx.file.extend(
+        [
+            "scoreboard players operation __cbrt__x --temp-- *= __cbrt__4d3 --temp--",
+            "scoreboard players operation __cbrt__output --temp-- = __cbrt__x --temp--",
+            f"function {tr.pack_namespace}:__lib__/__cbrt__loop",
+        ]
+    )
+
+    tr.files["__lib__/cbrt_loop"] = [
+        "scoreboard players operation __cbrt__output_change --temp-- = __cbrt__output --temp--",
+        "scoreboard players operation __cbrt__output --temp-- *= __cbrt__3d2 --temp--",
+        "scoreboard players operation __cbrt__output --temp-- /= FLOAT_PREC --temp--",
+        "scoreboard players operation __cbrt__x_t --temp-- =  __cbrt__x --temp--",
+        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
+        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
+        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
+        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
+        "scoreboard players operation __cbrt__output --temp-- += __cbrt__x_t --temp--",
+        "scoreboard players operation __cbrt__output_change --temp-- -= __cbrt__output --temp--",
+        "execute unless score __cbrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__cbrt__loop",
+    ]
+
+    return CplScore(token, "__cbrt__output --temp--", "float")
 
 
 add_lib(FunctionDeclaration(
     type="python-cpl",
     name="sqrt",
     function=lib_sqrt
+))
+
+add_lib(FunctionDeclaration(
+    type="python-cpl",
+    name="cbrt",
+    function=lib_cbrt
 ))
 
 '''def lib_isqrt(ctx: TranspilerContext, _, __):

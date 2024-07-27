@@ -2,6 +2,7 @@ from typing import Union, List
 
 from .base import CompileTimeValue
 from .nbt import CplNBT, object_get_index_nbt, val_nbt
+from .tuple import CplTuple
 from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import CplDefArray, get_expr_id
@@ -11,6 +12,12 @@ class CplArrayNBT(CplNBT):
     def __init__(self, token: Union[Token, None], location: str, type: CplDefArray):
         super().__init__(token, location, type)
         self.unique_type = type
+
+    def _set(self, ctx, cpl):
+        if isinstance(cpl, CplTuple) and len(cpl.value) == 0:
+            ctx.file.append(f"data modify {self.location} set value []")
+            return self
+        return super()._set(ctx, cpl)
 
     def _get_index(self, ctx, index: CompileTimeValue):
         if isinstance(index, CplString) and index.value == "length":

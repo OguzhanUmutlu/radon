@@ -739,12 +739,12 @@ def parse_iterate(
         if not isinstance(body, GroupToken) or body.open.value != "{":
             raise_syntax_error("Expected an expression inside the parentheses", body)
             return False
-        init = parse(spl[0], macros)
+        init = parse(spl[0], macros, class_names)
         if len(init) != 1:
             raise_syntax_error("Expected an expression in the initializer", t0)
         init = init[0]
 
-        it = parse(spl[2], macros)
+        it = parse(spl[2], macros, class_names)
         if len(it) != 1:
             raise_syntax_error("Expected an expression in the iterator", t0)
         it = it[0]
@@ -761,7 +761,7 @@ def parse_iterate(
         )
 
         loop_st_body = [if_st]
-        loop_st_body.extend(parse(body.children, macros))
+        loop_st_body.extend(parse(body.children, macros, class_names))
         loop_st_body.append(it)
 
         loop_st = LoopStatement(
@@ -825,7 +825,7 @@ def parse_iterate(
             start=t0.start,
             end=condition.end,
             time=tim,
-            body=parse(body.children, macros) + [if_st],
+            body=parse(body.children, macros, class_names) + [if_st],
         )
 
         statements.append(loop_st)
@@ -872,7 +872,7 @@ def parse_iterate(
             if_st.body = parse_str("break")[0]
 
         loop_st_body = [if_st]
-        loop_st_body.extend(parse(body.children, macros))
+        loop_st_body.extend(parse(body.children, macros, class_names))
 
         loop_st = LoopStatement(
             code=t0.code,
@@ -906,7 +906,7 @@ def parse_iterate(
             start=t0.start,
             end=body.end,
             time=tim,
-            body=parse(body.children, macros),
+            body=parse(body.children, macros, class_names),
         )
 
         statements.append(statement)
@@ -936,7 +936,7 @@ def parse_iterate(
                 )
             index[0] -= 1
         if isinstance(t2, GroupToken) and t2.open.value == "{":
-            stats = parse(t2.children, macros)
+            stats = parse(t2.children, macros, class_names)
             end_ind = t2.end
         else:
             if t0.value != "else":
@@ -1053,7 +1053,7 @@ def parse_iterate(
             start=t0.start,
             end=t2.end,
             name=t1.func if isinstance(t1, GroupToken) and t1.func else t1,
-            body=parse(t2.children, macros),
+            body=parse(t2.children, macros, class_names),
             arguments=[],
             returns=return_type,
         )
@@ -1123,7 +1123,7 @@ def parse_iterate(
             start=t0.start,
             end=got_tokens[-1].end,
             command=" ".join(t.value for t in got_tokens),
-            body=parse(body_g.children, macros),
+            body=parse(body_g.children, macros, class_names),
         )
         statements.append(statement)
         return True

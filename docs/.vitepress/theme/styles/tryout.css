@@ -1,5 +1,4 @@
 .loading {
-    font-family: MinecraftTen, sans-serif;
     position: fixed;
     left: 0;
     top: 0;
@@ -17,7 +16,6 @@ input,
 textarea,
 .file,
 .error {
-    font-family: MinecraftRegular, sans-serif;
     resize: none;
     margin-top: 20px;
     width: calc(100% - 40px);
@@ -59,18 +57,4 @@ textarea {
     max-height: 65vh;
     box-sizing: border-box;
     width: 100%;
-}
-
-body,
-.VPSidebarItem>.item>h2,
-code {
-    font-family: MinecraftRegular, sans-serif;
-}
-
-.name>.clip,
-h1,
-h2,
-h3,
-h4 {
-    font-family: MinecraftTen, sans-serif;
 }
