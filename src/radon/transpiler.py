@@ -1020,12 +1020,25 @@ class Transpiler:
             variable_cpl.compute(ctx, t1[0].value[0] + "=", CplInt(None, 1))
 
             return variable_cpl
-        if (t0[0].value == "const" and len(chains) > 2) or t1[0].value in SET_OP:
-            is_constant = t0[0].value == "const"
-            if is_constant:
-                t0 = t1
-                chains = chains[1:]
-                t1 = chains[1]
+        constant_keyword = False
+        if t0[0].value == "const":
+            constant_keyword = True
+            t0 = t1
+            if len(chains) < 3:
+                raise_syntax_error("Expected an expression for the assignment", t1[0])
+            t1 = chains[2]
+            chains = chains[1:]
+
+        front_type = cpl_def_from_tokens(self.classes, t0)
+        if front_type is not None:
+            t0 = t1
+            if len(chains) < 3:
+                raise_syntax_error("Expected an expression for the assignment", t1[0])
+            t1 = chains[2]
+            chains = chains[1:]
+
+        if t1[0].value in SET_OP:
+            is_constant = constant_keyword
             # TODO: [a, b, c] = [1, 2, 3] syntax and also for objects
             if (
                     t0[0].type != TokenType.IDENTIFIER
@@ -1054,9 +1067,15 @@ class Transpiler:
                     self.files["__load__"].append(
                         f'scoreboard objectives add {var_name} dummy "{var_name}"'
                     )
-                if cpl.unique_type.type == "tuple":
+                if isinstance(cpl, CplTuple) and (not front_type or len(cpl.value) > 0):
                     is_constant = True
-                self.variables[var_name] = VariableDeclaration(cpl, is_constant)
+                last_var_type = cpl
+                if front_type and front_type != cpl.unique_type:
+                    if isinstance(front_type, CplDefArray) and isinstance(cpl, CplTuple) and len(cpl.value) == 0:
+                        last_var_type = _type_to_cpl(t0[0], front_type, "", f"storage variables {var_name}")
+                    else:
+                        raise_syntax_error(f"Variable was defined as a {front_type} but got a {cpl.unique_type}", t0[0])
+                self.variables[var_name] = VariableDeclaration(last_var_type, is_constant)
                 if is_constant:
                     if (isinstance(var_name_token, SelectorIdentifierToken)
                             or isinstance(var_name_token, BlockIdentifierToken)):
@@ -1065,6 +1084,8 @@ class Transpiler:
                         del self.variables[var_name]
                     return cpl
             else:
+                if front_type:
+                    raise_syntax_error("Already defined variables cannot be assigned to a type", t1[0])
                 if var_name in self.variables and self.variables[var_name].constant:
                     raise_syntax_error("Variable is constant", t0[0])
                     raise ValueError("")

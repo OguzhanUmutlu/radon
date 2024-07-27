@@ -7,7 +7,7 @@ FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC
 
 _expr_id = 0
 
-VERSION_RADON = "1.1.0"
+VERSION_RADON = "1.1.2"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> Union[int, float]:
