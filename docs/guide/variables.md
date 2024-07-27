@@ -44,13 +44,13 @@ You can define constants using the keyword `const`, and after the `const` keywor
 ::: code-group
 
 ```js [Radon]
-const a = 1 # This is pre-computed
-const int b = 1 # Still the same thing
+const a = 1 // This is pre-computed
+const int b = 1 // Still the same thing
 
 print(a)
 
 # c = [] This would throw an error
-int[] c = [] # This is fine because now compiler knows it's values are of type int
+int[] c = [] // This is fine because now compiler knows it's values are of type int
 ```
 
 ```mcfunction [mcfunction]
