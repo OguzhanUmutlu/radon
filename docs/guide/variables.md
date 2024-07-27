@@ -49,7 +49,7 @@ const int b = 1 // Still the same thing
 
 print(a)
 
-# c = [] This would throw an error
+// c = [] This would throw an error
 int[] c = [] // This is fine because now compiler knows it's values are of type int
 ```
 
