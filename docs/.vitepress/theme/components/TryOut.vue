@@ -2,6 +2,7 @@
     <h3 id="version">Loading radon...</h3>
     <br>
     <input id="namespace" placeholder="Namespace..."><br>
+    <input id="pack_format" placeholder="Pack format..."><br>
     <textarea id="code" placeholder="Code..."></textarea><br>
     <div class="files"></div>
 </template>

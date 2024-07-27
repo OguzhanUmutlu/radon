@@ -45,7 +45,7 @@ from .utils import (
     FLOAT_PREC,
     get_expr_id,
     INT_LIMIT,
-    FLOAT_LIMIT, CplDefArray
+    FLOAT_LIMIT, CplDefArray, reset_expr_id
 )
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -221,9 +221,11 @@ ____ = ___0 + ___1 + ___2 + ___3 + ___4
 
 class Transpiler:
     def __init__(self, statements: List[Statement], macros: List[Statement], pack_namespace: str = "mypack",
-                 pack_format: int = 10, main_dir: str = "./") -> None:
+                 pack_description: str = "", pack_format: int = 48, main_dir: str = "./") -> None:
+        reset_expr_id()
         self.files = dict()
         self.pack_namespace = pack_namespace
+        self.pack_description = pack_description
         self.pack_format = pack_format
         self.main_dir = main_dir
         self.variables: Dict[str, VariableDeclaration] = dict()
@@ -232,8 +234,7 @@ class Transpiler:
         self.loops: Dict[Any, LoopDeclaration] = dict()
         self.init_libs = []
         self.data = dict()
-        self.tickFile = []
-        self.mainFile = []
+        self.main_file = []
         self.tempFiles: Dict[str, str] = dict()
 
         if len(statements) == 0:
@@ -254,12 +255,12 @@ class Transpiler:
             "scoreboard players set null global 0",
         ]
         self.files["__load__"] = load_file
+        self.load_file = load_file
         self.variables["false"] = VariableDeclaration(INT_TYPE, True)
         self.variables["true"] = VariableDeclaration(INT_TYPE, True)
         self.variables["null"] = VariableDeclaration(INT_TYPE, True)
-        self.tickFile = []
         main_file = []
-        self.mainFile = main_file
+        self.main_file = main_file
         self._transpile(
             TranspilerContext(
                 transpiler=self,
@@ -273,14 +274,11 @@ class Transpiler:
         load_file.append("# Main File #")
         load_file.append("")
         load_file += main_file
-        if len(self.tickFile) > 0:
-            if "tick" not in self.files:
-                self.files["tick"] = self.tickFile
-            else:
-                self.files["tick"] = self.tickFile + self.files["tick"]
 
         # remove the lines after immediate returns
         for file in self.files:
+            if not file.endswith(".mcfunction"):
+                continue
             lines = self.files[file]
             if len(lines) == 0:
                 continue
@@ -289,6 +287,32 @@ class Transpiler:
                 if line.startswith("return"):
                     break
             self.files[file] = lines[: index + 1]
+
+    def get_datapack_files(self):
+        fn_folder = "function" if self.pack_format >= 48 else "functions"
+        dp_files = dict()
+        for file in self.files:
+            dp_files[f"data/{self.pack_namespace}/{fn_folder}/{file}.mcfunction"] = "\n".join(self.files[file])
+        dp_files["pack.mcmeta"] = json.dumps({
+            "pack": {
+                "pack_format": self.pack_format,
+                "description": self.pack_description,
+            }
+        }, indent=4)
+        dp_files[f"data/minecraft/tags/{fn_folder}/load.json"] = json.dumps(
+            {
+                "values": [f"{self.pack_namespace}:__load__"]
+            }, indent=4)
+        if "tick" in self.files:
+            with open(
+                    f"data/minecraft/tags/{fn_folder}/tick.json", "w"
+            ) as file:
+                file.write(
+                    json.dumps(
+                        {"values": [f"{self.pack_namespace}:tick"]}, indent=4
+                    )
+                )
+        return dp_files
 
     def get_temp_file_name(self, content: str | List[str]):
         if isinstance(content, list):
@@ -555,7 +579,7 @@ class Transpiler:
                 file_name = statement.name.value.lower()
                 if ctx.class_name is not None:
                     cls = self.classes[ctx.class_name]
-                    file_name = "__class__/" + str(cls.id) + cls.name.lower() + "/" + file_name
+                    file_name = "__class__/" + cls.name.lower() + "_" + file_name
                 base_file_name = file_name
                 file_name_counter = 0
                 while file_name in self.files:
@@ -626,10 +650,10 @@ class Transpiler:
                     raise_syntax_error(f"Invalid type", statement)
                     raise SyntaxError("")
                 self.variables[name] = VariableDeclaration(type_v, False)
-                self.files["__load__"].append(
+                self.load_file.append(
                     f'scoreboard objectives add {name} dummy "{name}"'
                 )
-                self.files["__load__"].append(
+                self.load_file.append(
                     f"scoreboard players enable {name} global"
                 )
                 continue
@@ -1140,7 +1164,12 @@ class Transpiler:
             store_at = arg.store
             val = args[index]
             if arg.append:
-                ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
+                if isinstance(val, CplScore):
+                    ctx.file.append(
+                        f"data modify {store_at.location} append value {store_at.unique_type.get_sample_value()}")
+                    val.cache(ctx, f"{store_at.location}[-1]")
+                else:
+                    ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
             else:
                 store_at._set(ctx, val)
 

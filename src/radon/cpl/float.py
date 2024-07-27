@@ -68,7 +68,7 @@ class CplFloat(CplLiteral):
             return self
 
     def tellraw_object(self, ctx):
-        return f"'{self.value}'"
+        return f'"{self.value}"'
 
 
 from .int import CplInt

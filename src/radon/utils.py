@@ -7,7 +7,7 @@ FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC
 
 _expr_id = 0
 
-VERSION_RADON = "1.0.8"
+VERSION_RADON = "1.0.9"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> Union[int, float]:
@@ -60,7 +60,7 @@ def get_pack_format(version: str):
     if version.isnumeric() and (4 <= int(version) <= 18 or version == "48"):
         return int(version)
     version = version.split("-")[0]
-    if version[2] == "w":
+    if len(version) > 2 and version[2] == "w":
         version = version[:-1]
         spl = version.split("w")
         v = spl[0]

@@ -4,6 +4,10 @@ Radon is a programming language that gets compiled to Minecraft: Java Edition's 
 
 ![Radon code](./assets/code.png)
 
+## Discord Server
+
+<a target="_blank" href="https://discord.gg/xYjXnDp6h3"><img src="https://dcbadge.limes.pink/api/server/xYjXnDp6h3" alt="" /></a>
+
 ## Documentation
 
 Documentation is available on [GitHub Pages.](https://oguzhanumutlu.github.io/radon/)

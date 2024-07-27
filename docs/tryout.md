@@ -5,6 +5,7 @@
 <script type="module">
 
 const namespace = () => document.getElementById("namespace");
+const packFormat = () => document.getElementById("pack_format");
 const code = () => document.getElementById("code");
 const filesDiv = () => document.querySelector(".files");
 const versionDiv = () => document.getElementById("version");
@@ -37,6 +38,7 @@ VERSION_RADON`);
     versionDiv().innerText = "Radon v" + VERSION;
 
     namespace().addEventListener("input", updateCode);
+    packFormat().addEventListener("input", updateCode);
     code().addEventListener("input", updateCode);
     code().addEventListener("keydown", e => {
         if (e.key === "Tab") {
@@ -46,26 +48,28 @@ VERSION_RADON`);
     });
 }
 
-function transpile(namespace, code) {
+function transpile(namespace, packFormat, code) {
     return pyodide.runPython(`import json
 from radon.transpiler import Transpiler
 from radon.dp_ast import parse_str
 from radon.utils import reset_expr_id
 
-def main(namespace, code):
+def main(namespace, packFormat, code):
     try:
         reset_expr_id()
         (statements, macros) = parse_str(code)
-        transpiler = Transpiler(statements, macros, namespace)
-
-        for filename in transpiler.files:
-            transpiler.files[filename] = "\\n".join(transpiler.files[filename])
+        transpiler = Transpiler(
+            statements=statements,
+            macros=macros,
+            pack_namespace=namespace,
+            pack_description="",
+            pack_format=packFormat)
 
         return json.dumps(transpiler.files)
     except SyntaxError as e:
         return str(e)
 
-main`)(namespace, code);
+main`)(namespace, packFormat, code);
 }
 
 function updateCode() {
@@ -78,7 +82,7 @@ function updateCode() {
 
     if (!code().value.trim()) return;
 
-    let transpiled = transpile(namespace().value || "namespace", code().value);
+    let transpiled = transpile(namespace().value || "namespace", packFormat().value || "48", code().value);
 
     if (transpiled[0] != "{") {
         transpiled = transpiled.split(/(\x1b\[31m)|(\x1b\[4m)|(\x1b\[0m)/).filter(i => i);

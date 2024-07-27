@@ -1,18 +1,60 @@
 from typing import List
 
+from math import sqrt
 from ..cpl.base import CompileTimeValue
 from ..cpl.float import CplFloat
 from ..cpl.int import CplInt
 from ..cpl.score import CplScore
-from ..tokenizer import GroupToken
-from ..transpiler import FunctionArgument, FunctionDeclaration, TranspilerContext, NULL_VALUE, add_lib
-from ..utils import FLOAT_PREC
-from ..utils import get_expr_id
+from ..error import raise_syntax_error
+from ..transpiler import TranspilerContext, add_lib, FunctionDeclaration
 
 _ = 0
 
 
-def lib_isqrt(ctx: TranspilerContext, _, __):
+def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+    tr = ctx.transpiler
+    if len(args) != 1:
+        raise_syntax_error("Expected 1 argument for sqrt()", token)
+    n = args[0]
+    if n.unique_type.type not in {"int", "float"}:
+        raise_syntax_error("Expected an int or float argument for sqrt()", token)
+    if isinstance(n, CplInt) or isinstance(n, CplFloat):
+        return CplFloat(token, sqrt(float(n.value)))
+    n.cache(ctx, score_loc="__sqrt__x", force="score")
+
+    if "has_sqrt_init" not in tr.data:
+        tr.data["has_sqrt_init"] = True
+        tr.files["__load__"].append("scoreboard players set __sqrt__2 --temp-- 2")
+        tr.files["__load__"].append("scoreboard players set __sqrt__4 --temp-- 4")
+
+    ctx.file.extend(
+        [
+            "scoreboard players operation __sqrt__x --temp-- /= __sqrt__4 --temp--",
+            "scoreboard players operation __sqrt__output --temp-- = __sqrt__x --temp--",
+            f"function {tr.pack_namespace}:__lib__/__sqrt__loop",
+        ]
+    )
+
+    tr.files["__lib__/sqrt_loop"] = [
+        "scoreboard players operation __sqrt__output_change --temp-- = __sqrt__output --temp--",
+        "scoreboard players operation __sqrt__output --temp-- /= __sqrt__2 --temp--",
+        "scoreboard players operation __sqrt__x_t --temp-- =  __sqrt__x --temp--",
+        "scoreboard players operation __sqrt__x_t --temp-- /= __sqrt__output --temp--",
+        "scoreboard players operation __sqrt__x_t --temp-- *= FLOAT_PREC --temp--",
+        "scoreboard players operation __sqrt__output --temp-- += __sqrt__x_t --temp--",
+        "scoreboard players operation __sqrt__output_change --temp-- -= __sqrt__output --temp--",
+        "execute unless score __sqrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__sqrt__loop",
+    ]
+    return CplScore(token, "__sqrt__output", "float")
+
+
+add_lib(FunctionDeclaration(
+    type="python-cpl",
+    name="sqrt",
+    function=lib_sqrt
+))
+
+'''def lib_isqrt(ctx: TranspilerContext, _, __):
     tr = ctx.transpiler
     file = ctx.file
     if "has_sqrt_init" not in tr.data:
@@ -277,4 +319,4 @@ math_dec(name="floor", args=[("float", "int_floor")], returns="int", func=lib_fl
 math_dec(name="ceil", args=[("float", "int_ceil")], returns="int", func=lib_ceil)
 math_dec(name="round", args=[("float", "int_round")], returns="int", func=lib_round)
 math_dec(name="min", args=None, returns=None, func=lib_min_max)
-math_dec(name="max", args=None, returns=None, func=lib_min_max)
+math_dec(name="max", args=None, returns=None, func=lib_min_max)'''

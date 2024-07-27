@@ -84,11 +84,19 @@ def build():
 
     try:
         (statements, macros) = parse_str(code)
-        transpiler = Transpiler(statements, macros, config["namespace"], config["format"], config["main"] + "/../")
+        transpiler = Transpiler(
+            statements=statements,
+            macros=macros,
+            pack_namespace=config["namespace"],
+            pack_description=config["description"],
+            pack_format=config["format"],
+            main_dir=config["main"] + "/../")
     except SyntaxError as e:
         return str(e)
     except Exception as e:
         raise e
+
+    dp_files = transpiler.get_datapack_files()
 
     out_folders = (
         config["outFolder"]
@@ -104,69 +112,33 @@ def build():
 
     rm_files = lock.split("\n") if lock else []
 
-    functions_folder = "function" if config["format"] >= 48 else "functions"
-
     for out_folder in out_folders:
-        os.makedirs(out_folder, exist_ok=True)
         if config["useLock"]:
             for f in rm_files:
                 f = f"{out_folder}/{f}"
-                if path.exists(f) and path.isfile(f):
+                if not path.exists(f):
+                    continue
+                if path.isfile(f):
                     os.remove(f)
                 dr = path.dirname(f)
                 empty_dir_recursive(dr)
         else:
-            shutil.rmtree(
-                f"{out_folder}/data/{config['namespace']}/{functions_folder}", ignore_errors=True
-            )
-
-        with open(out_folder + f"/pack.mcmeta", "w") as file:
-            file.write(
-                json.dumps(
-                    {
-                        "pack": {
-                            "pack_format": config["format"],
-                            "description": config["description"],
-                        }
-                    },
-                    indent=4,
-                )
-            )
-
-        os.makedirs(out_folder + f"/data/minecraft/tags/{functions_folder}", exist_ok=True)
-
-        with open(out_folder + f"/data/minecraft/tags/{functions_folder}/load.json", "w") as file:
-            file.write(
-                json.dumps({"values": [f"{config['namespace']}:__load__"]}, indent=4)
-            )
-
-        if "tick" in transpiler.files:
-            with open(
-                    f"{out_folder}/data/minecraft/tags/{functions_folder}/tick.json", "w"
-            ) as file:
-                file.write(
-                    json.dumps(
-                        {"values": [f"{config['namespace']}:tick"]}, indent=4
-                    )
-                )
-
-    new_files = dict()
-    for filename in transpiler.files:
-        new_files[f"data/{config['namespace']}/{functions_folder}/{filename}.mcfunction"] = (
-            transpiler.files[filename]
-        )
+            shutil.rmtree(out_folder + "/data", ignore_errors=True)
+            if path.exists(out_folder + "/pack.mcmeta"):
+                os.remove(out_folder + "/pack.mcmeta")
+            os.makedirs(out_folder + "/data", exist_ok=True)
 
     for out_folder in out_folders:
-        for pt in new_files:
+        for pt in dp_files:
             file_name = pt
             pt = f"{out_folder}/{pt}"
             os.makedirs(pathr(pt + "/../"), exist_ok=True)
             with open(pt, "w") as file:
-                file.write("\n".join(new_files[file_name]))
+                file.write(dp_files[file_name])
 
     if config["useLock"]:
         with open(f"{cwd}/radon.lock", "w") as file:
-            file.write("\n".join(new_files.keys()))
+            file.write("\n".join(dp_files.keys()))
 
 
 def init():
