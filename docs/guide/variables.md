@@ -39,6 +39,27 @@ data modify block 0 -63 0 Items set value [{"count": 1, "Slot": 0, "id": "minecr
 
 :::
 
+You can define constants using the keyword `const`, and after the `const` keyword you can optionally put the type:
+
+::: code-group
+
+```js [Radon]
+const a = 1 # This is pre-computed
+const int b = 1 # Still the same thing
+
+print(a)
+
+# c = [] This would throw an error
+int[] c = [] # This is fine because now compiler knows it's values are of type int
+```
+
+```mcfunction [mcfunction]
+tellraw @a ["1"]
+data modify storage variables c set value []
+```
+
+:::
+
 You can use mathematical expressions basically everywhere like this:
 
 ::: code-group
