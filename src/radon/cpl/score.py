@@ -61,7 +61,7 @@ class CplScore(CompileTimeValue):
             mul = "int 1"
             if force_t == "float" and t_have == "int":
                 mul = f"int {FLOAT_PREC}"
-            if force_t == "int" and t_have == "float":
+            if t_have == "float":
                 mul = f"float {1 / FLOAT_PREC:.7f}"
             ctx.file.append(f"execute store result {nbt_loc} {mul} run scoreboard players get {self.location}")
             return val_nbt(self.token, nbt_loc, force_t or self.unique_type)
@@ -122,8 +122,8 @@ class CplScore(CompileTimeValue):
             ctx.file.append(f"scoreboard players operation {self.location} = {cpl.location}")
         else:
             if t_want == "int":
-                ctx.file.append(f"execute store score {self.location} run data get {cpl.location}")
-            ctx.file.append(f"execute store score {self.location} run data get {cpl.location} {FLOAT_PREC}")
+                ctx.file.append(f"execute result store score {self.location} run data get {cpl.location}")
+            ctx.file.append(f"execute store result score {self.location} run data get {cpl.location} {FLOAT_PREC}")
             return self
         if t_want == "int" and t_have == "float":
             ctx.file.append(f"scoreboard players operation {self.location} /= FLOAT_PREC --temp--")
@@ -271,8 +271,8 @@ class CplScore(CompileTimeValue):
                     + '"}}')
         eid = get_expr_id()
         ctx.file.append(
-            f"execute store storage temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
-        return '{"storage":"temp","nbt":"_' + eid + '"}'
+            f"execute store result storage temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
+        return '{"storage":"temp","nbt":"_' + str(eid) + '"}'
 
 
 from .float import CplFloat
