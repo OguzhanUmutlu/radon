@@ -27,7 +27,7 @@ You can use multi line commands by using the `\` character. This character is us
 Example:
 
 ```js
-execute as @a   \
+execute as @a       \
            at @s    \
            run      \
            say hi!
