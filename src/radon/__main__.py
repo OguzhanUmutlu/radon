@@ -104,21 +104,23 @@ def build():
 
     rm_files = lock.split("\n") if lock else []
 
-    for outFolder in out_folders:
-        os.makedirs(outFolder, exist_ok=True)
+    functions_folder = "function" if config["format"] >= 48 else "functions"
+
+    for out_folder in out_folders:
+        os.makedirs(out_folder, exist_ok=True)
         if config["useLock"]:
             for f in rm_files:
-                f = f"{outFolder}/{f}"
+                f = f"{out_folder}/{f}"
                 if path.exists(f) and path.isfile(f):
                     os.remove(f)
                 dr = path.dirname(f)
                 empty_dir_recursive(dr)
         else:
             shutil.rmtree(
-                f"{outFolder}/data/{config['namespace']}/functions", ignore_errors=True
+                f"{out_folder}/data/{config['namespace']}/{functions_folder}", ignore_errors=True
             )
 
-        with open(outFolder + f"/pack.mcmeta", "w") as file:
+        with open(out_folder + f"/pack.mcmeta", "w") as file:
             file.write(
                 json.dumps(
                     {
@@ -131,16 +133,16 @@ def build():
                 )
             )
 
-        os.makedirs(outFolder + "/data/minecraft/tags/functions", exist_ok=True)
+        os.makedirs(out_folder + f"/data/minecraft/tags/{functions_folder}", exist_ok=True)
 
-        with open(outFolder + "/data/minecraft/tags/functions/load.json", "w") as file:
+        with open(out_folder + f"/data/minecraft/tags/{functions_folder}/load.json", "w") as file:
             file.write(
                 json.dumps({"values": [f"{config['namespace']}:__load__"]}, indent=4)
             )
 
         if "tick" in transpiler.files:
             with open(
-                    f"{outFolder}/data/minecraft/tags/functions/tick.json", "w"
+                    f"{out_folder}/data/minecraft/tags/{functions_folder}/tick.json", "w"
             ) as file:
                 file.write(
                     json.dumps(
@@ -150,17 +152,17 @@ def build():
 
     new_files = dict()
     for filename in transpiler.files:
-        new_files[f"data/{config['namespace']}/functions/{filename}.mcfunction"] = (
+        new_files[f"data/{config['namespace']}/{functions_folder}/{filename}.mcfunction"] = (
             transpiler.files[filename]
         )
 
-    for outFolder in out_folders:
+    for out_folder in out_folders:
         for pt in new_files:
-            fname = pt
-            pt = f"{outFolder}/{pt}"
+            file_name = pt
+            pt = f"{out_folder}/{pt}"
             os.makedirs(pathr(pt + "/../"), exist_ok=True)
             with open(pt, "w") as file:
-                file.write("\n".join(new_files[fname]))
+                file.write("\n".join(new_files[file_name]))
 
     if config["useLock"]:
         with open(f"{cwd}/radon.lock", "w") as file:
@@ -240,12 +242,6 @@ def init():
 
 
 def watch_snapshot():
-    lock = ""
-    if path.exists(f"{cwd}/radon.lock"):
-        with open(f"{cwd}/radon.lock", "r") as file:
-            lock = file.read().strip("\n")
-
-    lock = lock.split("\n") if lock else []
     files = []
     files += map(
         lambda x: path.join("./", x),
@@ -294,11 +290,6 @@ def check_for_changes():
 
 
 def main():
-    c = """a = [1, 2, 3, 4]
-
-a[0] = 10
-
-"""
     global files_snapshot
     print(f"{YELLOW}Radon v{VERSION_RADON}{RESET}")
     print("")
