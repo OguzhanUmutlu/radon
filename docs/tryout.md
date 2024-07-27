@@ -65,11 +65,11 @@ def main(namespace, packFormat, code):
             pack_description="",
             pack_format=packFormat)
 
-        return json.dumps(transpiler.files)
+        return json.dumps(transpiler.get_datapack_files())
     except SyntaxError as e:
         return str(e)
 
-main`)(namespace, packFormat, code);
+main`)(namespace, packFormat * 1 || 48, code);
 }
 
 function updateCode() {
@@ -126,12 +126,16 @@ function updateCode() {
 
         const name = document.createElement("div");
         name.classList.add("filename");
-        name.innerText = filename + ".mcfunction";
+        name.innerText = filename;
         file.appendChild(name);
 
         const content = document.createElement("div");
         content.classList.add("file-content");
-        content.innerText = text;
+        const content_code = document.createElement("textarea");
+        content_code.readOnly = true;
+        content_code.value = text.trim();
+        requestAnimationFrame(() => content_code.style.height = content_code.scrollHeight + "px");
+        content.appendChild(content_code);
         file.appendChild(content);
 
         filesDiv().appendChild(file);

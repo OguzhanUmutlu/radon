@@ -17,7 +17,7 @@ import "../styles/tryout.css";
     width: 100vw;
 }
 
-#namespace {
+#namespace, #pack_format {
     width: 100%;
 }
 </style>

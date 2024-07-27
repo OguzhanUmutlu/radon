@@ -51,6 +51,14 @@ textarea,
     white-space: nowrap;
 }
 
+.file-content > textarea {
+    padding: 0;
+    margin: 0;
+    font-family: var(--vp-font-family-base);
+    max-height: unset;
+    transition: all .5s;
+}
+
 textarea {
     height: 20vh;
     min-height: 20vh;
