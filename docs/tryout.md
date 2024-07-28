@@ -74,7 +74,7 @@ main`)(namespace, packFormat * 1 || 48, code);
 
 function updateCode() {
     code().style.height = "auto";
-    code().style.height = code.scrollHeight + "px";
+    code().style.height = code().scrollHeight + "px";
 
     for (const child of [...filesDiv().children]) {
         filesDiv().removeChild(child);
