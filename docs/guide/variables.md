@@ -69,11 +69,11 @@ d = a + b * c
 ```
 
 ```mcfunction [mcfunction]
-scoreboard players operation int_1 --temp-- = b global
-scoreboard players operation int_1 --temp-- *= c global
-scoreboard players operation int_2 --temp-- = a global
-scoreboard players operation int_2 --temp-- += int_1 --temp--
-scoreboard players operation d global = int_2 --temp--
+scoreboard players operation int_1 __temp__ = b global
+scoreboard players operation int_1 __temp__ *= c global
+scoreboard players operation int_2 __temp__ = a global
+scoreboard players operation int_2 __temp__ += int_1 __temp__
+scoreboard players operation d global = int_2 __temp__
 ```
 
 :::
@@ -100,10 +100,10 @@ scoreboard players operation myBool global = true global
 scoreboard players set myEntityBool global 0
 execute if entity @e[type=zombie] run scoreboard players set myEntityBool global 1
 execute unless score myEntityBool global matches 0..0 run function radon:__if__/1
-scoreboard players set int_2 --temp-- 0
-execute unless score myEntityBool global matches 0..0 run scoreboard players set int_2 --temp-- 1
-execute unless score myBool global matches 0..0 run scoreboard players set int_2 --temp-- 1
-execute unless score int_2 --temp-- matches 0..0 run function radon:__if__/3
+scoreboard players set int_2 __temp__ 0
+execute unless score myEntityBool global matches 0..0 run scoreboard players set int_2 __temp__ 1
+execute unless score myBool global matches 0..0 run scoreboard players set int_2 __temp__ 1
+execute unless score int_2 __temp__ matches 0..0 run function radon:__if__/3
 ```
 
 :::
@@ -132,30 +132,30 @@ myArrLen = myArr.length
 
 ```mcfunction [mcfunction]
 scoreboard players set a global 5640
-scoreboard players operation sqrt_0 --temp-- = a global
-scoreboard players operation __sqrt__x --temp-- /= __sqrt__4 --temp--
-scoreboard players operation __sqrt__output --temp-- = __sqrt__x --temp--
+scoreboard players operation sqrt_0 __temp__ = a global
+scoreboard players operation __sqrt__x __temp__ /= __sqrt__4 __temp__
+scoreboard players operation __sqrt__output __temp__ = __sqrt__x __temp__
 function namespace_here:__lib__/__sqrt__loop
 scoreboard players operation b global = null global
 scoreboard players set c global 2374
-scoreboard players operation cbrt_0 --temp-- = a global
-scoreboard players operation __cbrt__x --temp-- *= __cbrt__4d3 --temp--
-scoreboard players operation __cbrt__output --temp-- = __cbrt__x --temp--
+scoreboard players operation cbrt_0 __temp__ = a global
+scoreboard players operation __cbrt__x __temp__ *= __cbrt__4d3 __temp__
+scoreboard players operation __cbrt__output __temp__ = __cbrt__x __temp__
 function namespace_here:__lib__/__cbrt__loop
 scoreboard players operation d global = null global
-scoreboard players operation int_1 --temp-- = a global
-scoreboard players operation int_1 --temp-- /= FLOAT_PREC --temp--
-scoreboard players operation e global = int_1 --temp--
+scoreboard players operation int_1 __temp__ = a global
+scoreboard players operation int_1 __temp__ /= FLOAT_PREC __temp__
+scoreboard players operation e global = int_1 __temp__
 scoreboard players operation f global = a global
 data modify storage variables myStr set value "hello"
-execute store result score int_2 --temp-- run data get storage variables myStr
-scoreboard players operation myStrLen global = int_2 --temp--
+execute store result score int_2 __temp__ run data get storage variables myStr
+scoreboard players operation myStrLen global = int_2 __temp__
 data modify storage variables myArr set value [1, 2, 3]
 data modify storage variables myArr append value 4
 data remove storage variables myArr[-1]
 data modify storage variables myArr insert 0 value 5
-execute store result score int_5 --temp-- run data get storage variables myArr
-scoreboard players operation myArrLen global = int_5 --temp--
+execute store result score int_5 __temp__ run data get storage variables myArr
+scoreboard players operation myArrLen global = int_5 __temp__
 ```
 
 :::

@@ -13,7 +13,7 @@ class CplStringNBT(CplNBT):
 
     def _get_index(self, ctx, index: CompileTimeValue):
         if isinstance(index, CplString) and index.value == "length":
-            eid = f"int_{get_expr_id()} --temp--"
+            eid = f"int_{get_expr_id()} __temp__"
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
         return None

@@ -64,7 +64,7 @@ def num_eq_neq(self, ctx, cpl, is_eq):
             v = int(v)
         if score_t == "float":
             v = int(v * FLOAT_PREC)
-        eid = f"int_{get_expr_id()} --temp--"
+        eid = f"int_{get_expr_id()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute if score {cpl.location} matches {v}..{v} "
                         f"run scoreboard players set {eid} 1")
@@ -88,7 +88,7 @@ def num_cmp(self, ctx, cpl, op):
         v = int(v)
     if score_t == "float":
         v = int(v * FLOAT_PREC)
-    eid = f"int_{get_expr_id()} --temp--"
+    eid = f"int_{get_expr_id()} __temp__"
     ctx.file.append(f"scoreboard players set {eid} 0")
     matcher = ""
     if inv_op == ">":

@@ -15,10 +15,10 @@ def lib_ftime(ctx: TranspilerContext, _):
     lib_time(ctx, _)
     tr = ctx.transpiler
     tr.files["__load__"].append(
-        f"scoreboard players set FTIME_FLOAT_PREC --temp-- {int(FLOAT_PREC / 20)}"
+        f"scoreboard players set FTIME_FLOAT_PREC __temp__ {int(FLOAT_PREC / 20)}"
     )
     ctx.file.append(
-        f"scoreboard players operation __ftime__time__ *= FTIME_FLOAT_PREC --temp--"
+        f"scoreboard players operation __ftime__time__ *= FTIME_FLOAT_PREC __temp__"
     )
 
 

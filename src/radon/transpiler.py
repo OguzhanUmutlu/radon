@@ -245,12 +245,12 @@ class Transpiler:
         load_file = [
             "# Setup #",
             "",
-            'scoreboard objectives add --temp-- dummy "--temp--"',
+            'scoreboard objectives add __temp__ dummy "__temp__"',
             'scoreboard objectives add global dummy "global"',
             'scoreboard objectives add __break__ dummy "__break__"',
             'scoreboard objectives add __continue__ dummy "__continue__"',
-            "scoreboard players set null --temp-- 0",
-            "scoreboard players set FLOAT_PREC --temp-- " + str(FLOAT_PREC),
+            "scoreboard players set null __temp__ 0",
+            "scoreboard players set FLOAT_PREC __temp__ " + str(FLOAT_PREC),
             "scoreboard players set true global 1",
             "scoreboard players set false global 0",
             "scoreboard players set null global 0",
@@ -556,7 +556,7 @@ class Transpiler:
                     ret_loc = _type_to_cpl(
                         statement.returns[0],
                         ret,
-                        score_loc=f"fn_return_{eid} --temp--",
+                        score_loc=f"fn_return_{eid} __temp__",
                         nbt_loc=f"storage fn_return _{eid}",
                     )
                 is_class_init = fn_name == ctx.class_name
@@ -624,7 +624,7 @@ class Transpiler:
                 if f.returns == "auto":
                     f.returns = "void"
                 if f.returns != "void":
-                    fn_file.insert(0, f"scoreboard players set __returned__ --temp-- 0")
+                    fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
                 continue
             if isinstance(statement, ReturnStatement):
                 if not ctx.function:
@@ -654,7 +654,7 @@ class Transpiler:
                         ctx.function.returns._set(ctx, cpl)
 
                 if ctx.file is not self.files[ctx.function.file_name]:
-                    ctx.file.append(f"scoreboard players set __returned__ --temp-- 1")
+                    ctx.file.append(f"scoreboard players set __returned__ __temp__ 1")
                 ctx.file.append(f"return 0")
                 if ctx.file is self.files[ctx.function.file_name]:
                     return
@@ -806,7 +806,7 @@ class Transpiler:
             cmd_str += cmd[i]
             i += 1
 
-        eid = ("int_" + str(get_expr_id()) + " --temp--")  # TODO: Does it have to be an int? Can I allow floats?
+        eid = ("int_" + str(get_expr_id()) + " __temp__")  # TODO: Does it have to be an int? Can I allow floats?
         eid_val = CplScore(pointer, eid, "int")
 
         if not has_repl:
@@ -897,7 +897,7 @@ class Transpiler:
                             found = arg
                             break
                     if found:
-                        if found.store_via == {"stack", "macro"}:
+                        if found.store_via in {"stack", "macro"}:
                             return val_nbt(found.store.token, found.store.location + "[-1]",
                                            found.store.unique_type.content)
                         return found.store
@@ -1261,11 +1261,11 @@ class Transpiler:
             # the line after these comments is for the case where you call a function inside a function
             # example:
             # function test(): void {
-            #   # "scoreboard players set __returned__ --temp-- 0" runs:
+            #   # "scoreboard players set __returned__ __temp__ 0" runs:
             #   # __returned__ = 0
             #   a()
             #   # __returned__ = 1
-            #   # "scoreboard players set __returned__ --temp-- 0" runs again and:
+            #   # "scoreboard players set __returned__ __temp__ 0" runs again and:
             #   # __returned__ = 0
             #   return
             # }
@@ -1273,8 +1273,8 @@ class Transpiler:
             #   test()
             #   return
             # }
-            if ctx.function and returns:
-                ctx.file.append(f"scoreboard players set __returned__ --temp-- 0")
+            if ctx.function and returns != "void":
+                ctx.file.append(f"scoreboard players set __returned__ __temp__ 0")
             if isinstance(returns, str):
                 if returns == "auto":
                     raise_syntax_error(
@@ -1318,7 +1318,7 @@ class Transpiler:
 def _return_safe(ctx: TranspilerContext):
     if ctx.function:
         ctx.file.append(
-            f"execute if score __returned__ --temp-- matches 1..1 run return 0"
+            f"execute if score __returned__ __temp__ matches 1..1 run return 0"
         )
     if ctx.loop:
         if ctx.file is ctx.loop.file:

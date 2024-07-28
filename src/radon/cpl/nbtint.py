@@ -15,7 +15,7 @@ class CplIntNBT(CplNBT):
             ctx.file.append(f"execute store result score {score_loc} run data get {self.location}")
             t = "int"
             if force_t == "float":
-                ctx.file.append(f"scoreboard players operation {score_loc} *= FLOAT_PREC --temp--")
+                ctx.file.append(f"scoreboard players operation {score_loc} *= FLOAT_PREC __temp__")
                 t = "float"
             return CplScore(self.token, score_loc, t)
         return super()._cache(ctx, score_loc, nbt_loc, force, force_t)

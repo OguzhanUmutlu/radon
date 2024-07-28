@@ -24,29 +24,29 @@ def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
     if "has_sqrt_init" not in tr.data:
         tr.data["has_sqrt_init"] = True
-        tr.files["__load__"].append("scoreboard players set __sqrt__2 --temp-- 2")
-        tr.files["__load__"].append("scoreboard players set __sqrt__4 --temp-- 4")
+        tr.files["__load__"].append("scoreboard players set __sqrt__2 __temp__ 2")
+        tr.files["__load__"].append("scoreboard players set __sqrt__4 __temp__ 4")
 
     ctx.file.extend(
         [
-            "scoreboard players operation __sqrt__x --temp-- /= __sqrt__4 --temp--",
-            "scoreboard players operation __sqrt__output --temp-- = __sqrt__x --temp--",
+            "scoreboard players operation __sqrt__x __temp__ /= __sqrt__4 __temp__",
+            "scoreboard players operation __sqrt__output __temp__ = __sqrt__x __temp__",
             f"function {tr.pack_namespace}:__lib__/__sqrt__loop",
         ]
     )
 
     tr.files["__lib__/sqrt_loop"] = [
-        "scoreboard players operation __sqrt__output_change --temp-- = __sqrt__output --temp--",
-        "scoreboard players operation __sqrt__output --temp-- /= __sqrt__2 --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- =  __sqrt__x --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- /= __sqrt__output --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __sqrt__output --temp-- += __sqrt__x_t --temp--",
-        "scoreboard players operation __sqrt__output_change --temp-- -= __sqrt__output --temp--",
+        "scoreboard players operation __sqrt__output_change __temp__ = __sqrt__output __temp__",
+        "scoreboard players operation __sqrt__output __temp__ /= __sqrt__2 __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ =  __sqrt__x __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ /= __sqrt__output __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __sqrt__output __temp__ += __sqrt__x_t __temp__",
+        "scoreboard players operation __sqrt__output_change __temp__ -= __sqrt__output __temp__",
         "execute unless score __sqrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__sqrt__loop",
     ]
 
-    return CplScore(token, "__sqrt__output --temp--", "float")
+    return CplScore(token, "__sqrt__output __temp__", "float")
 
 
 def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
@@ -63,35 +63,35 @@ def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     if "has_cbrt_init" not in tr.data:
         tr.data["has_cbrt_init"] = True
         tr.files["__load__"].append(
-            f"scoreboard players set __cbrt__3d2 --temp-- {int(FLOAT_PREC * 3 / 2)}"
+            f"scoreboard players set __cbrt__3d2 __temp__ {int(FLOAT_PREC * 3 / 2)}"
         )
         tr.files["__load__"].append(
-            f"scoreboard players set __cbrt__4d3 --temp-- {int(FLOAT_PREC * 4 / 3)}"
+            f"scoreboard players set __cbrt__4d3 __temp__ {int(FLOAT_PREC * 4 / 3)}"
         )
 
     ctx.file.extend(
         [
-            "scoreboard players operation __cbrt__x --temp-- *= __cbrt__4d3 --temp--",
-            "scoreboard players operation __cbrt__output --temp-- = __cbrt__x --temp--",
+            "scoreboard players operation __cbrt__x __temp__ *= __cbrt__4d3 __temp__",
+            "scoreboard players operation __cbrt__output __temp__ = __cbrt__x __temp__",
             f"function {tr.pack_namespace}:__lib__/__cbrt__loop",
         ]
     )
 
     tr.files["__lib__/cbrt_loop"] = [
-        "scoreboard players operation __cbrt__output_change --temp-- = __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__output --temp-- *= __cbrt__3d2 --temp--",
-        "scoreboard players operation __cbrt__output --temp-- /= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- =  __cbrt__x --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__output --temp-- += __cbrt__x_t --temp--",
-        "scoreboard players operation __cbrt__output_change --temp-- -= __cbrt__output --temp--",
+        "scoreboard players operation __cbrt__output_change __temp__ = __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__output __temp__ *= __cbrt__3d2 __temp__",
+        "scoreboard players operation __cbrt__output __temp__ /= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ =  __cbrt__x __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ /= __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ /= __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__output __temp__ += __cbrt__x_t __temp__",
+        "scoreboard players operation __cbrt__output_change __temp__ -= __cbrt__output __temp__",
         "execute unless score __cbrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__cbrt__loop",
     ]
 
-    return CplScore(token, "__cbrt__output --temp--", "float")
+    return CplScore(token, "__cbrt__output __temp__", "float")
 
 
 add_lib(FunctionDeclaration(
@@ -111,25 +111,25 @@ add_lib(FunctionDeclaration(
     file = ctx.file
     if "has_sqrt_init" not in tr.data:
         tr.data["has_sqrt_init"] = True
-        tr.files["__load__"].append("scoreboard players set __sqrt__2 --temp-- 2")
-        tr.files["__load__"].append("scoreboard players set __sqrt__4 --temp-- 4")
+        tr.files["__load__"].append("scoreboard players set __sqrt__2 __temp__ 2")
+        tr.files["__load__"].append("scoreboard players set __sqrt__4 __temp__ 4")
 
     file.extend(
         [
-            "scoreboard players operation __isqrt__x_4 --temp-- = __isqrt__x --temp--",
-            "scoreboard players operation __isqrt__x_4 --temp-- /= __isqrt__4 --temp--",
-            "scoreboard players operation __isqrt__output --temp-- = __isqrt__x_4 --temp--",
+            "scoreboard players operation __isqrt__x_4 __temp__ = __isqrt__x __temp__",
+            "scoreboard players operation __isqrt__x_4 __temp__ /= __isqrt__4 __temp__",
+            "scoreboard players operation __isqrt__output __temp__ = __isqrt__x_4 __temp__",
             f"function {tr.pack_namespace}:__lib__/__isqrt__loop",
         ]
     )
 
     tr.files["__lib__/isqrt_loop"] = [
-        "scoreboard players operation __isqrt__output_change --temp-- = __isqrt__output --temp--",
-        "scoreboard players operation __isqrt__output --temp-- /= __isqrt__2 --temp--",
-        "scoreboard players operation __isqrt__x_t --temp-- =  __isqrt__x_4 --temp--",
-        "scoreboard players operation __isqrt__x_t --temp-- /= __isqrt__output --temp--",
-        "scoreboard players operation __isqrt__output --temp-- += __isqrt__x_t --temp--",
-        "scoreboard players operation __isqrt__output_change --temp-- -= __isqrt__output --temp--",
+        "scoreboard players operation __isqrt__output_change __temp__ = __isqrt__output __temp__",
+        "scoreboard players operation __isqrt__output __temp__ /= __isqrt__2 __temp__",
+        "scoreboard players operation __isqrt__x_t __temp__ =  __isqrt__x_4 __temp__",
+        "scoreboard players operation __isqrt__x_t __temp__ /= __isqrt__output __temp__",
+        "scoreboard players operation __isqrt__output __temp__ += __isqrt__x_t __temp__",
+        "scoreboard players operation __isqrt__output_change __temp__ -= __isqrt__output __temp__",
         "execute unless score __isqrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__isqrt__loop",
     ]
 
@@ -155,31 +155,31 @@ def lib_cbrt(ctx: TranspilerContext, _, __):
     if "has_cbrt_init" not in tr.data:
         tr.data["has_cbrt_init"] = True
         tr.files["__load__"].append(
-            f"scoreboard players set __cbrt__3d2 --temp-- {int(FLOAT_PREC * 3 / 2)}"
+            f"scoreboard players set __cbrt__3d2 __temp__ {int(FLOAT_PREC * 3 / 2)}"
         )
         tr.files["__load__"].append(
-            f"scoreboard players set __cbrt__4d3 --temp-- {int(FLOAT_PREC * 4 / 3)}"
+            f"scoreboard players set __cbrt__4d3 __temp__ {int(FLOAT_PREC * 4 / 3)}"
         )
 
     file.extend(
         [
-            "scoreboard players operation __cbrt__x --temp-- *= __cbrt__4d3 --temp--",
-            "scoreboard players operation __cbrt__output --temp-- = __cbrt__x --temp--",
+            "scoreboard players operation __cbrt__x __temp__ *= __cbrt__4d3 __temp__",
+            "scoreboard players operation __cbrt__output __temp__ = __cbrt__x __temp__",
             f"function {tr.pack_namespace}:__lib__/__cbrt__loop",
         ]
     )
 
     tr.files["__lib__/cbrt_loop"] = [
-        "scoreboard players operation __cbrt__output_change --temp-- = __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__output --temp-- *= __cbrt__3d2 --temp--",
-        "scoreboard players operation __cbrt__output --temp-- /= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- =  __cbrt__x --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __cbrt__x_t --temp-- /= __cbrt__output --temp--",
-        "scoreboard players operation __cbrt__output --temp-- += __cbrt__x_t --temp--",
-        "scoreboard players operation __cbrt__output_change --temp-- -= __cbrt__output --temp--",
+        "scoreboard players operation __cbrt__output_change __temp__ = __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__output __temp__ *= __cbrt__3d2 __temp__",
+        "scoreboard players operation __cbrt__output __temp__ /= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ =  __cbrt__x __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ /= __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __cbrt__x_t __temp__ /= __cbrt__output __temp__",
+        "scoreboard players operation __cbrt__output __temp__ += __cbrt__x_t __temp__",
+        "scoreboard players operation __cbrt__output_change __temp__ -= __cbrt__output __temp__",
         "execute unless score __cbrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__cbrt__loop",
     ]
 
@@ -198,8 +198,8 @@ def lib_sqrt(ctx: TranspilerContext, _, __):
     file = ctx.file
     if "has_sqrt_init" not in tr.data:
         tr.data["has_sqrt_init"] = True
-        tr.files["__load__"].append("scoreboard players set __sqrt__2 --temp-- 2")
-        tr.files["__load__"].append("scoreboard players set __sqrt__4 --temp-- 4")
+        tr.files["__load__"].append("scoreboard players set __sqrt__2 __temp__ 2")
+        tr.files["__load__"].append("scoreboard players set __sqrt__4 __temp__ 4")
 
     # x = x / 4
     # output = x
@@ -213,53 +213,53 @@ def lib_sqrt(ctx: TranspilerContext, _, __):
 
     file.extend(
         [
-            "scoreboard players operation __sqrt__x --temp-- /= __sqrt__4 --temp--",
-            "scoreboard players operation __sqrt__output --temp-- = __sqrt__x --temp--",
+            "scoreboard players operation __sqrt__x __temp__ /= __sqrt__4 __temp__",
+            "scoreboard players operation __sqrt__output __temp__ = __sqrt__x __temp__",
             f"function {tr.pack_namespace}:__lib__/__sqrt__loop",
         ]
     )
 
     tr.files["__lib__/sqrt_loop"] = [
-        "scoreboard players operation __sqrt__output_change --temp-- = __sqrt__output --temp--",
-        "scoreboard players operation __sqrt__output --temp-- /= __sqrt__2 --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- =  __sqrt__x --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- /= __sqrt__output --temp--",
-        "scoreboard players operation __sqrt__x_t --temp-- *= FLOAT_PREC --temp--",
-        "scoreboard players operation __sqrt__output --temp-- += __sqrt__x_t --temp--",
-        "scoreboard players operation __sqrt__output_change --temp-- -= __sqrt__output --temp--",
+        "scoreboard players operation __sqrt__output_change __temp__ = __sqrt__output __temp__",
+        "scoreboard players operation __sqrt__output __temp__ /= __sqrt__2 __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ =  __sqrt__x __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ /= __sqrt__output __temp__",
+        "scoreboard players operation __sqrt__x_t __temp__ *= FLOAT_PREC __temp__",
+        "scoreboard players operation __sqrt__output __temp__ += __sqrt__x_t __temp__",
+        "scoreboard players operation __sqrt__output_change __temp__ -= __sqrt__output __temp__",
         "execute unless score __sqrt__output_change matches 0..0 run function $PACK_NAME$:__lib__/__sqrt__loop",
     ]
 
 
 def lib_float(ctx: TranspilerContext, _, __):
     ctx.file.append(
-        f"scoreboard players operation float_float --temp-- *= FLOAT_PREC --temp--"
+        f"scoreboard players operation float_float __temp__ *= FLOAT_PREC __temp__"
     )
 
 
 def lib_int(ctx: TranspilerContext, _, __):
     ctx.file.append(
-        f"scoreboard players operation int_int --temp-- /= FLOAT_PREC --temp--"
+        f"scoreboard players operation int_int __temp__ /= FLOAT_PREC __temp__"
     )
 
 
 def lib_floor(ctx: TranspilerContext, _, __):
     ctx.file.append(
-        f"scoreboard players operation int_floor --temp-- /= FLOAT_PREC --temp--"
+        f"scoreboard players operation int_floor __temp__ /= FLOAT_PREC __temp__"
     )
 
 
 def lib_ceil(ctx: TranspilerContext, _, __):
-    ctx.file.append(f"scoreboard players add int_ceil --temp-- {int(FLOAT_PREC - 1)}")
+    ctx.file.append(f"scoreboard players add int_ceil __temp__ {int(FLOAT_PREC - 1)}")
     ctx.file.append(
-        f"scoreboard players operation int_ceil --temp-- /= FLOAT_PREC --temp--"
+        f"scoreboard players operation int_ceil __temp__ /= FLOAT_PREC __temp__"
     )
 
 
 def lib_round(ctx: TranspilerContext, _, __):
-    ctx.file.append(f"scoreboard players add int_round --temp-- {int(FLOAT_PREC / 2)}")
+    ctx.file.append(f"scoreboard players add int_round __temp__ {int(FLOAT_PREC / 2)}")
     ctx.file.append(
-        f"scoreboard players operation int_round --temp-- /= FLOAT_PREC --temp--"
+        f"scoreboard players operation int_round __temp__ /= FLOAT_PREC __temp__"
     )
 
 
@@ -302,27 +302,27 @@ def lib_min_max(
     if min_num is not None:
         if score_t == "float":
             min_num = int(FLOAT_PREC * min_num)
-        file.append(f"scoreboard players set {last_score} --temp-- {min_num}")
+        file.append(f"scoreboard players set {last_score} __temp__ {min_num}")
         if len(new_scores) == 0:
             return last_score
     else:
         score = new_scores.pop(0)
         file.append(
-            f"scoreboard players operation {last_score} --temp-- = {score.location} --temp--"
+            f"scoreboard players operation {last_score} __temp__ = {score.location} __temp__"
         )
         if score.unique_type.type == "int" and score_t == "float":
             file.append(
-                f"scoreboard players operation {last_score} --temp-- *= FLOAT_PREC --temp--"
+                f"scoreboard players operation {last_score} __temp__ *= FLOAT_PREC __temp__"
             )
 
     for score in new_scores:
         if score.unique_type.type == "int" and score_t == "float":
             file.append(
-                f"scoreboard players operation {score.location} --temp-- *= FLOAT_PREC --temp--"
+                f"scoreboard players operation {score.location} __temp__ *= FLOAT_PREC __temp__"
             )
         file.append(
-            f"execute if score {score.location} --temp-- {op} {last_score} --temp-- "
-            f"run scoreboard players operation {last_score} --temp-- = {score.location} --temp--"
+            f"execute if score {score.location} __temp__ {op} {last_score} __temp__ "
+            f"run scoreboard players operation {last_score} __temp__ = {score.location} __temp__"
         )
 
     return last_score
@@ -347,7 +347,7 @@ def math_dec(name, args, returns, func, return_loc=None):
                         CplScore(
                             None,
                             (arg[1] if isinstance(arg, tuple) else f"{name}_{index}")
-                            + " --temp--",
+                            + " __temp__",
                             arg[0] if isinstance(arg, tuple) else arg,
                         ),
                         False
