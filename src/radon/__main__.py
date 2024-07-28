@@ -3,6 +3,7 @@ import os
 import platform
 import shutil
 import sys
+from argparse import ArgumentParser
 from os import path
 from time import sleep, time
 from typing import Any
@@ -10,11 +11,6 @@ from typing import Any
 from .dp_ast import parse_str
 from .transpiler import Transpiler
 from .utils import VERSION_RADON, get_pack_format
-
-# get the path that the file is running from
-cwd = os.getcwd()
-
-arg = sys.argv[1] if len(sys.argv) > 1 else "build"
 
 BLACK = "\x1b[30m"
 RED = "\x1b[31m"
@@ -26,6 +22,29 @@ CYAN = "\x1b[36m"
 WHITE = "\x1b[37m"
 RESET = "\x1b[0m"
 GRAY = "\x1b[90m"
+
+
+# Usage: radon [build|watch] (-d="cwd")
+
+class RadonArgumentParser(ArgumentParser):
+    def __init__(self):
+        super().__init__()
+        self.add_argument("command", default="build", choices=["build", "watch"],
+                          help="The command to run (build or watch)")
+        self.add_argument("-d", default=os.getcwd(), type=str, help="sets the working directory")
+        self.prog = "radon"
+
+    def error(self, message):
+        sys.stderr.write(RED)
+        self.print_help(sys.stderr)
+        sys.stderr.write(f"\nError: {message}\n")
+        sys.stderr.write(RESET)
+        sys.exit(2)
+
+
+parser = RadonArgumentParser()
+args = parser.parse_args()
+cwd = args.d
 
 
 # real path
@@ -153,12 +172,6 @@ def init():
             main_file = file
             break
 
-    pack_name = get_input(f"{CYAN}Name(Leave blank to cancel): {RESET}")
-
-    if not pack_name:
-        print(f"{RED}Cancelling...{RESET}")
-        sys.exit(0)
-
     pack_namespace = get_input(f"{CYAN}Namespace(Leave blank to cancel): {RESET}")
 
     if not pack_namespace:
@@ -192,7 +205,6 @@ def init():
         file.write(
             json.dumps(
                 {
-                    "name": pack_name,
                     "namespace": pack_namespace,
                     "description": pack_desc,
                     "format": pack_format,
@@ -200,7 +212,7 @@ def init():
                     "outFolder": pack_output_folder,
                     "useLock": False,
                 },
-                indent=4,
+                indent=2,
             )
         )
 
@@ -270,7 +282,7 @@ def main():
 
     init()
 
-    if arg == "build":
+    if args.command == "build":
         start = time()
         built = build()
         if isinstance(built, str):
@@ -282,7 +294,7 @@ def main():
         print(f"{GREEN}Datapack has been built!{GRAY} ({took:.5f}s){RESET}")
         sys.exit(0)
 
-    if arg != "watch":
+    if args.command != "watch":
         print(
             f"{RED}Invalid argument! Usage: {CYAN}radon [build|watch]{RED} or just {CYAN}radon{RESET} to build"
         )

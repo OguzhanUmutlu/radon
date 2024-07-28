@@ -60,7 +60,10 @@ export default defineConfig({
                             text: "Getting Started",
                             link: "/guide/"
                         },
-
+                        {
+                            text: "Config",
+                            link: "/guide/config/"
+                        },
                         {
                             text: "Comments",
                             link: "/guide/comments"

@@ -299,18 +299,18 @@ class Transpiler:
                 "pack_format": self.pack_format,
                 "description": self.pack_description,
             }
-        }, indent=4)
+        }, indent=2)
         dp_files[f"data/minecraft/tags/{fn_folder}/load.json"] = json.dumps(
             {
                 "values": [f"{self.pack_namespace}:__load__"]
-            }, indent=4)
+            }, indent=2)
         if "tick" in self.files:
             with open(
                     f"data/minecraft/tags/{fn_folder}/tick.json", "w"
             ) as file:
                 file.write(
                     json.dumps(
-                        {"values": [f"{self.pack_namespace}:tick"]}, indent=4
+                        {"values": [f"{self.pack_namespace}:tick"]}, indent=2
                     )
                 )
         return dp_files
