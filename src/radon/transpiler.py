@@ -604,8 +604,6 @@ class Transpiler:
                 self.functions.append(f)
                 fn_file = []
                 self.files[file_name] = fn_file
-                if ret_loc != "void":
-                    fn_file.append(f"scoreboard players set __returned__ --temp-- 0")
                 for index, arg in enumerate(arguments):
                     if arg.store_via == "macro":
                         t = arg.store.unique_type.content  # type: CplDef
@@ -625,6 +623,8 @@ class Transpiler:
                 )
                 if f.returns == "auto":
                     f.returns = "void"
+                if f.returns != "void":
+                    fn_file.insert(0, f"scoreboard players set __returned__ --temp-- 0")
                 continue
             if isinstance(statement, ReturnStatement):
                 if not ctx.function:
