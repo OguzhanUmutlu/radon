@@ -254,7 +254,7 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
                     )
                     and len(pc[-1].selector.value
                             if isinstance(pc[-1], SelectorIdentifierToken)
-                            else "") == 2  # has to be a short selector like @a, @r
+                            else pc[-1].value) == 2  # has to be a short selector like @a, @r
             )
 
             # func(arguments...)
@@ -435,7 +435,8 @@ def _tokenize_iterate(
         return
 
     for op in OPERATORS_L:
-        if code[index[0]: index[0] + len(op) + (op in WORD_OPERATORS)] == op:
+        op_got = code[index[0]: index[0] + len(op)]
+        if op_got == op and (op not in WORD_OPERATORS or code[index[0] + len(op)] == " "):
             tokens.append(Token(code, TokenType.OPERATOR, index[0], index[0] + len(op)))
             index[0] += len(op) - 1
             return
@@ -443,7 +444,7 @@ def _tokenize_iterate(
         tokens.append(Token(code, TokenType.OPERATOR, index[0], index[0] + 1))
         return
     if char in QUOTES:
-        startIndex = index[0]
+        start_index = index[0]
         index[0] += 1
         backslash = False
         while index[0] < len(code):
@@ -457,13 +458,13 @@ def _tokenize_iterate(
             index[0] += 1
         if index[0] == len(code) or code[index[0]] == EOL_CHAR:
             raise_syntax_error_t(
-                "Unterminated string", code, startIndex, startIndex + 1
+                "Unterminated string", code, start_index, start_index + 1
             )
-        value = code[startIndex + 1: index[0]]
-        token: Token = Token(code, TokenType.STRING_LITERAL, startIndex, index[0] + 1)
+        value = code[start_index + 1: index[0]]
+        token: Token = Token(code, TokenType.STRING_LITERAL, start_index, index[0] + 1)
         tokens.append(token)
         return
-    startIndex = index[0]
+    start_index = index[0]
     index[0] += 1
     while index[0] < len(code):
         char2 = code[index[0]]
@@ -473,7 +474,7 @@ def _tokenize_iterate(
         index[0] += 1
     if index[0] == len(code):
         index[0] -= 1
-    value = code[startIndex: index[0] + 1]
+    value = code[start_index: index[0] + 1]
     type = TokenType.IDENTIFIER
     if value in KEYWORDS:
         type = TokenType.KEYWORD
@@ -482,15 +483,15 @@ def _tokenize_iterate(
     if value not in KEYWORDS and len(tokens) > 0 and tokens[-1].value == "-" and (
             len(tokens) == 1 or tokens[-2].type in {TokenType.OPERATOR, TokenType.SYMBOL}):
         tokens.pop()
-        startIndex -= 1
+        start_index -= 1
     if (
             type == TokenType.INT_LITERAL
             and len(tokens) > 0
             and tokens[-1].value == "."
-            and tokens[-1].end == startIndex
+            and tokens[-1].end == start_index
             and (
             len(tokens) == 1
-            or tokens[-2].end != startIndex - 1
+            or tokens[-2].end != start_index - 1
             or tokens[-2].type == TokenType.INT_LITERAL
     )
     ):
@@ -499,7 +500,7 @@ def _tokenize_iterate(
         start = tokens.pop().start
         tokens.append(Token(code, TokenType.FLOAT_LITERAL, start, index[0] + 1))
         return True
-    tokens.append(Token(code, type, startIndex, index[0] + 1))
+    tokens.append(Token(code, type, start_index, index[0] + 1))
 
 
 def _tokenize(code: str, can_macro=True):

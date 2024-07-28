@@ -181,6 +181,7 @@ from .cpl.array import CplArray
 from .cpl.tuple import CplTuple
 from .cpl.object import CplObject
 from .cpl.score import CplScore
+from .cpl.selector import CplSelector
 from .cpl.nbt import CplNBT, val_nbt
 from .cpl.nbtobject import CplObjectNBT
 
@@ -256,9 +257,9 @@ class Transpiler:
         ]
         self.files["__load__"] = load_file
         self.load_file = load_file
-        self.variables["false"] = VariableDeclaration(INT_TYPE, True)
-        self.variables["true"] = VariableDeclaration(INT_TYPE, True)
-        self.variables["null"] = VariableDeclaration(INT_TYPE, True)
+        self.variables["false"] = VariableDeclaration(INT_TYPE, False)
+        self.variables["true"] = VariableDeclaration(INT_TYPE, False)
+        self.variables["null"] = VariableDeclaration(INT_TYPE, False)
         main_file = []
         self.main_file = main_file
         self._transpile(
@@ -459,7 +460,7 @@ class Transpiler:
                 if (
                         isinstance(resp, CplInt)
                         or isinstance(resp, CplFloat)
-                        or resp.unique_type.type not in {"int", "float"}):
+                        or (resp.unique_type.type not in {"int", "float"} and not isinstance(resp, CplSelector))):
                     is_true = (not isinstance(resp, CplInt) and not isinstance(resp, CplFloat)) or resp.value != 0
                     if is_true:
                         if not has_if:
@@ -470,10 +471,16 @@ class Transpiler:
                     ):  # I know this is bad, but the linter wants it (statement.elseBody)
                         self._transpile(ctx, statement.elseBody)
                     continue
-                if not isinstance(resp, CplScore):
+                if isinstance(resp, CplNBT):
                     resp = resp.cache(ctx, force="score")
-                if_cmd = f"execute unless score {resp.location} matches 0..0 run "
-                unless_cmd = f"execute if score {resp.location} matches 0..0 run "
+                if isinstance(resp, CplScore):
+                    if_cmd = f"execute unless score {resp.location} matches 0..0 run "
+                    unless_cmd = f"execute if score {resp.location} matches 0..0 run "
+                elif isinstance(resp, CplSelector):
+                    if_cmd = f"execute if entity {resp.value} run "
+                    unless_cmd = f"execute unless entity {resp.value} run "
+                else:
+                    raise SyntaxError("Invalid condition")
                 has_one = (has_if or has_else) and (not has_if or not has_else)
                 if has_one:
                     one_body = statement.body if has_if else statement.elseBody
@@ -954,6 +961,8 @@ class Transpiler:
             return CplFloat(t, t.value)
         if t.type == TokenType.STRING_LITERAL:
             return CplString(t, t.value[1:-1])
+        if t.type == TokenType.SELECTOR:
+            return CplSelector(t, t.value)
         if (
                 t.type == TokenType.SELECTOR_IDENTIFIER
                 or t.type == TokenType.BLOCK_IDENTIFIER
@@ -1068,6 +1077,9 @@ class Transpiler:
                         f'scoreboard objectives add {var_name} dummy "{var_name}"'
                     )
                 if isinstance(cpl, CplTuple) and (not front_type or len(cpl.value) > 0):
+                    if len(cpl.value) == 0:
+                        show_warning(f"Did you mean to initialize an array instead of a tuple? "
+                                     f"Use this syntax: int[] <variable_name> = []", t1[0])
                     is_constant = True
                 last_var_type = cpl
                 if front_type and front_type != cpl.unique_type:
@@ -1075,6 +1087,8 @@ class Transpiler:
                         last_var_type = _type_to_cpl(t0[0], front_type, "", f"storage variables {var_name}")
                     else:
                         raise_syntax_error(f"Variable was defined as a {front_type} but got a {cpl.unique_type}", t0[0])
+                if isinstance(cpl, CplSelector):
+                    last_var_type = INT_TYPE
                 self.variables[var_name] = VariableDeclaration(last_var_type, is_constant)
                 if is_constant:
                     if (isinstance(var_name_token, SelectorIdentifierToken)
@@ -1093,6 +1107,17 @@ class Transpiler:
                     raise_syntax_error("Already defined variables cannot be assigned with the 'const' keyword", t0[0])
 
             variable_cpl = self.chain_to_cpl(ctx, t0)  # type: CplScore | CplNBT
+
+            if variable_cpl.unique_type.type in {"int", "float"} and isinstance(cpl, CplSelector):
+                variable_cpl._set(ctx, CplInt(t0[0], 0))
+                if isinstance(variable_cpl, CplScore):
+                    set_1 = f"scoreboard players set {variable_cpl.location} 1"
+                elif isinstance(variable_cpl, CplNBT):
+                    set_1 = f"data modify storage variables {variable_cpl.location} set value 1"
+                else:
+                    raise ValueError("")
+                ctx.file.append(f"execute if entity {cpl.value} run {set_1}")
+                return variable_cpl
 
             if variable_cpl.unique_type == "int" and cpl.unique_type == "float":
                 show_warning("Losing float precision by assigning a float to an int.", t1[0])

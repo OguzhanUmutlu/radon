@@ -215,6 +215,7 @@ EXPR_EXPR = [
     TokenType.STRING_LITERAL,
     TokenType.IDENTIFIER,
     TokenType.SELECTOR_IDENTIFIER,
+    TokenType.SELECTOR
 ]
 
 EXPR_OP = list("+-*/%")

@@ -22,6 +22,9 @@ class CplScore(CompileTimeValue):
         elif type == "float":
             self.unique_type = FLOAT_TYPE
 
+    def get_data_str(self, ctx):
+        return "from " + self.cache(ctx, force="nbt").location
+
     def as_int(self, ctx, score_loc=None):
         if self.unique_type.type == "int":
             return self
@@ -242,6 +245,8 @@ class CplScore(CompileTimeValue):
         return None
 
     def _and(self, ctx, cpl):
+        if isinstance(cpl, CplSelector):
+            return cpl._and(ctx, self)
         eid = f"int_{get_expr_id()} --temp--"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
@@ -251,6 +256,8 @@ class CplScore(CompileTimeValue):
         return CplScore(self.token, eid)
 
     def _or(self, ctx, cpl):
+        if isinstance(cpl, CplSelector):
+            return cpl._and(ctx, self)
         eid = f"int_{get_expr_id()} --temp--"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
@@ -280,3 +287,4 @@ from .int import CplInt
 from .nbt import val_nbt
 from .nbtfloat import CplFloatNBT
 from .nbtint import CplIntNBT
+from .selector import CplSelector

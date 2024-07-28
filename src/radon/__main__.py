@@ -7,6 +7,7 @@ from os import path
 from time import sleep, time
 from typing import Any
 
+from src.radon.tokenizer import tokenize
 from .dp_ast import parse_str
 from .transpiler import Transpiler
 from .utils import VERSION_RADON, get_pack_format

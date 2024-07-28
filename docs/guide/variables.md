@@ -78,6 +78,36 @@ scoreboard players operation d global = int_2 --temp--
 
 :::
 
+You can even store booleans in variables so that Minecraft doesn't have to compute selectors multiple times:
+
+::: code-group
+
+```js [Radon]
+myBool = true
+myEntityBool = @e[type=zombie] // Sets to true if there is a zombie, false otherwise
+
+if (myEntityBool) {
+  print("There's a zombie!")
+}
+
+if (myEntityBool or myBool) {
+  print("There's a zombie or my bool is true!!")
+}
+```
+
+```mcfunction [mcfunction]
+scoreboard players operation myBool global = true global
+scoreboard players set myEntityBool global 0
+execute if entity @e[type=zombie] run scoreboard players set myEntityBool global 1
+execute unless score myEntityBool global matches 0..0 run function radon:__if__/1
+scoreboard players set int_2 --temp-- 0
+execute unless score myEntityBool global matches 0..0 run scoreboard players set int_2 --temp-- 1
+execute unless score myBool global matches 0..0 run scoreboard players set int_2 --temp-- 1
+execute unless score int_2 --temp-- matches 0..0 run function radon:__if__/3
+```
+
+:::
+
 There are a couple of methods and attributes assigned to built-in types:
 
 ::: code-group

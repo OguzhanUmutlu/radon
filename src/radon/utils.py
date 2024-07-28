@@ -3,11 +3,11 @@ from typing import Dict, Union, List, Any
 
 FLOAT_PREC = 1000
 INT_LIMIT = 2147483647
-FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC
+FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC  # 2147483.647
 
 _expr_id = 0
 
-VERSION_RADON = "1.1.2"
+VERSION_RADON = "1.1.3"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> Union[int, float]:
@@ -280,6 +280,18 @@ class CplDefObject(CplDef):
         )
 
 
+class CplDefSelector(CplDef):
+    def __init__(self):
+        super().__init__("selector")
+
+    def __str__(self) -> str:
+        return "selector"
+
+    def get_sample_value(self) -> str:
+        raise SyntaxError("Selectors cannot be sampled")
+
+
 INT_TYPE = CplDefInt()
 FLOAT_TYPE = CplDefFloat()
 STRING_TYPE = CplDefString()
+SELECTOR_TYPE = CplDefSelector()
