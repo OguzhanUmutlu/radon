@@ -1061,7 +1061,10 @@ def parse_iterate(
         if isinstance(t1, GroupToken) and t1.func:
             spl = split_tokens(t1.children)
             for s in spl:
-                chain = chain_tokens(s)
+                o_chain = chain_tokens(s)
+                chain = o_chain
+                if len(chain) == 3 and chain[0][0].value == "$":
+                    chain = chain[1:]
                 if len(chain) != 2:
                     raise_syntax_error("Expected a valid function argument", s[0])
                 c_type = chain[0]
@@ -1070,7 +1073,7 @@ def parse_iterate(
                     raise_syntax_error(
                         "Expected a valid type for the argument", c_type[0]
                     )
-                statement.arguments.append(chain)
+                statement.arguments.append(o_chain)
 
         statements.append(statement)
         return True

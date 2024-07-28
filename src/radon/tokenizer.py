@@ -40,7 +40,7 @@ WORD_OPERATORS = ["is not", "is", "and", "or"]
 INC_OP = ["++", "--"]
 CMP_OP = ["==", "!=", ">", "<", ">=", "<=", "is", "is not"]
 CMP_COMBINE_OP = ["&&", "||", "and", "or"]
-SYMBOL = list("}]){[(:,@\\.~^")
+SYMBOL = list("}]){[(:,@\\.~^$")
 QUOTES = list("\"'")
 WHITESPACE = list(" \t\v")
 EOL_CHAR = "\n"

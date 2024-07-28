@@ -7,7 +7,7 @@ FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC  # 2147483.647
 
 _expr_id = 0
 
-VERSION_RADON = "1.1.3"
+VERSION_RADON = "1.1.4"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> Union[int, float]:
@@ -258,7 +258,7 @@ class CplDefTuple(CplDef):
 
 
 class CplDefObject(CplDef):
-    def __init__(self, type: Dict[str, CplDef], class_name: Union[str, None]):
+    def __init__(self, type: Dict[str, CplDef], class_name: str | None = None):
         super().__init__("object")
         self.content = type
         self.class_name = class_name

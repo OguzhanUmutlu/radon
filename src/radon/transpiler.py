@@ -94,12 +94,12 @@ def split_cmp(expr: List[Token]):
 
 
 class FunctionArgument:
-    def __init__(self, name, store, append=True):
-        # type: (str, CplScore | CplNBT,bool) -> None
+    def __init__(self, name, store, store_via):
+        # type: (str, CplScore | CplNBT, str) -> None
         self.name = name
-        self.unique_type = store.unique_type.content if append else store.unique_type
+        self.unique_type = store.unique_type.content if store_via in {"stack", "macro"} else store.unique_type
         self.store = store
-        self.append = append
+        self.store_via = store_via  # set, stack, macro
 
 
 class LoopDeclaration:
@@ -602,12 +602,20 @@ class Transpiler:
                 )
 
                 self.functions.append(f)
-                self.files[file_name] = []
+                fn_file = []
+                self.files[file_name] = fn_file
+                for index, arg in enumerate(arguments):
+                    if arg.store_via == "macro":
+                        t = arg.store.unique_type.content  # type: CplDef
+                        macro = f"$({arg.store.location.split(' ')[-1]})"
+                        if t.type == "string":
+                            macro = f'"{macro}"'
+                        fn_file.append(f"$data modify {arg.store.location} append value {macro}")
                 self._transpile(
                     TranspilerContext(
                         transpiler=self,
                         file_name=file_name,
-                        file=self.files[file_name],
+                        file=fn_file,
                         function=f,
                         loop=ctx.loop,
                         class_name=ctx.class_name),
@@ -704,6 +712,10 @@ class Transpiler:
         arg_names = []
         arguments = []
         for arg in chains:
+            store_via = "stack"
+            if len(arg) > 0 and arg[0][0].value == "$":
+                store_via = "macro"
+                arg = arg[1:]
             if len(arg) != 2 or arg[1][0].type != TokenType.IDENTIFIER:
                 raise_syntax_error("Invalid argument for a function", arg[0][0])
             arg_type_parsed = cpl_def_from_tokens(self.classes, arg[0])
@@ -719,11 +731,12 @@ class Transpiler:
                     arg_name,
                     _type_to_cpl(
                         arg[0][0],
-                        CplDefArray(arg_type_parsed),
+                        CplDefArray(arg_type_parsed) if store_via in {"stack", "macro"} else arg_type_parsed,
                         score_loc="",
-                        nbt_loc=f"storage fn_args _{eid}",
+                        nbt_loc=f"storage fn_args {arg_name}",
                         force_nbt=True
-                    )
+                    ),
+                    store_via=store_via
                 )
             )
         return arguments
@@ -752,6 +765,7 @@ class Transpiler:
             if (
                     cmd[i: i + 2] == "$("
                     or cmd[i: i + 5] == "$str("
+                    or cmd[i: i + 5] == "$jstr("
             ):
                 si = i
                 k = 0
@@ -782,6 +796,8 @@ class Transpiler:
 
                 elif cmd[si + 1] == "s":
                     cmd_str += val.tellraw_object(ctx)
+                elif cmd[si + 1] == "j":
+                    cmd_str += json.dumps(val.tellraw_object(ctx))
 
                 i += 1
                 continue
@@ -879,7 +895,7 @@ class Transpiler:
                             found = arg
                             break
                     if found:
-                        if found.append:
+                        if found.store_via == {"stack", "macro"}:
                             return val_nbt(found.store.token, found.store.location + "[-1]",
                                            found.store.unique_type.content)
                         return found.store
@@ -1206,21 +1222,26 @@ class Transpiler:
         if found_fn.type == "python-cpl":
             return found_fn.function(ctx, args, base)
 
+        has_any_macro_argument = False
+
         for index, arg in enumerate(fn_args):
             store_at = arg.store
             val = args[index]
-            if arg.append:
+            if arg.store_via == "stack":
                 if isinstance(val, CplScore):
                     ctx.file.append(
                         f"data modify {store_at.location} append value {store_at.unique_type.get_sample_value()}")
                     val.cache(ctx, f"{store_at.location}[-1]")
                 else:
                     ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
+            elif arg.store_via == "macro":
+                val.cache(ctx, nbt_loc=f"storage fn_args_macro {arg.store.location.split(' ')[-1]}", force="nbt")
+                has_any_macro_argument = True
             else:
                 store_at._set(ctx, val)
 
         if found_fn.type == "mcfunction":
-            ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}")
+            ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name} with storage fn_mem")
 
         if found_fn.type == "python":
             found_fn.function(ctx, found_fn, base)
@@ -1230,9 +1251,11 @@ class Transpiler:
         if found_fn.type == "radon":
             if returns != "void":
                 ctx.file.append(f"scoreboard players set __returned__ --temp-- 0")
-            ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}")
+            ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
+                f" with storage fn_args_macro" if has_any_macro_argument else ""
+            ))
             for index, arg in enumerate(fn_args):
-                if arg.append:
+                if arg.store_via == "stack":
                     ctx.file.append(f"data remove {arg.store.location}[-1]")
 
             # the line after these comments is for the case where you call a function inside a function

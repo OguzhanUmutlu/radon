@@ -125,8 +125,9 @@ class CplScore(CompileTimeValue):
             ctx.file.append(f"scoreboard players operation {self.location} = {cpl.location}")
         else:
             if t_want == "int":
-                ctx.file.append(f"execute result store score {self.location} run data get {cpl.location}")
-            ctx.file.append(f"execute store result score {self.location} run data get {cpl.location} {FLOAT_PREC}")
+                ctx.file.append(f"execute store result score {self.location} run data get {cpl.location}")
+            else:
+                ctx.file.append(f"execute store result score {self.location} run data get {cpl.location} {FLOAT_PREC}")
             return self
         if t_want == "int" and t_have == "float":
             ctx.file.append(f"scoreboard players operation {self.location} /= FLOAT_PREC --temp--")

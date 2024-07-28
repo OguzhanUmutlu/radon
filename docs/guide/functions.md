@@ -44,6 +44,21 @@ y = myOverloadingFunction(10.0, 20.0) // gives 20.0
 
 ***
 
+You might be wondering how you can run the function from the game. You can use vanilla macros by putting a `$` behind
+the type of the argument you want to sign as a macro. Here's a simple example:
+
+```js
+fn my_function($int a) {
+  print("The integer you gave is: ", a)
+}
+
+my_function(10)
+// Or from the game you can run this:
+function your_namespace:my_function {a: 10}
+```
+
+***
+
 Calculating nth fibonacci number:
 
 ```js
