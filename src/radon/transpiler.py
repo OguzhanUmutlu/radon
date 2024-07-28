@@ -604,6 +604,8 @@ class Transpiler:
                 self.functions.append(f)
                 fn_file = []
                 self.files[file_name] = fn_file
+                if ret_loc != "void":
+                    fn_file.append(f"scoreboard players set __returned__ --temp-- 0")
                 for index, arg in enumerate(arguments):
                     if arg.store_via == "macro":
                         t = arg.store.unique_type.content  # type: CplDef
@@ -1249,8 +1251,6 @@ class Transpiler:
         actually_returning = NULL_VALUE
 
         if found_fn.type == "radon":
-            if returns != "void":
-                ctx.file.append(f"scoreboard players set __returned__ --temp-- 0")
             ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
                 f" with storage fn_args_macro" if has_any_macro_argument else ""
             ))
