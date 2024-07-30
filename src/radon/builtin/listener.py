@@ -2,7 +2,7 @@ import json
 import re
 from typing import List
 
-from src.radon.cpl.int import CplInt
+from ..cpl.int import CplInt
 from ..cpl._base import CompileTimeValue
 from ..cpl.object import CplObject
 from ..cpl.string import CplString

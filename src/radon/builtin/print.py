@@ -1,7 +1,7 @@
 from typing import List
 
-from src.radon.cpl.int import CplInt
-from src.radon.error import raise_syntax_error
+from ..cpl.int import CplInt
+from ..error import raise_syntax_error
 from ..cpl._base import CompileTimeValue
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 
