@@ -98,7 +98,7 @@ from .utils import (
     CplDef,
     CplDefArray,
     CplDefObject,
-    TokenType,
+    TokenType, SELECTOR_TYPE, CplDefFunction,
 )
 
 EmptyToken = Token("", TokenType.SYMBOL, 0, 0)
@@ -150,6 +150,20 @@ class BlockIdentifierToken(Token):
         self.name = name
 
 
+class LambdaFunctionToken(Token):
+    def __init__(
+            self,
+            code: str,
+            start: int,
+            end: int,
+            arguments: GroupToken,
+            body: GroupToken
+    ):
+        super().__init__(code, TokenType.LAMBDA_FUNCTION, start, end)
+        self.arguments = arguments
+        self.body = body
+
+
 def cpl_def_from_tokens(classes, tokens):
     # type: (Dict[str, Any] | List[str], List[Token]) -> CplDef | None
     """
@@ -171,6 +185,17 @@ def cpl_def_from_tokens(classes, tokens):
         type = FLOAT_TYPE
     if t0.value == "string":
         type = STRING_TYPE
+    if t0.value == "selector":
+        type = SELECTOR_TYPE
+    if isinstance(t0, GroupToken) and t0.open.value == "(" and len(t0.children) > 2:
+        t0c = t0.children
+        if not isinstance(t0c[0], GroupToken) or t0c[0].open.value != "(" or t0c[1].value != "=" or t0c[2].value != ">":
+            return None
+
+        type = CplDefFunction(
+            list(map(lambda x: cpl_def_from_tokens(classes, x), split_tokens(t0c[0].children))),
+            cpl_def_from_tokens(classes, t0c[3:])
+        )
     if isinstance(t0, GroupToken) and t0.open.value == "{":
         dct = {}
         spl = split_tokens(t0.children)
@@ -308,11 +333,28 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
             parent.end = token.end
             parent.update_value()
 
+            ppc = parent.parent.children
+
+            if (token.value == "}" and len(ppc) > 3 and ppc[-2].value == ">" and ppc[-3].value == "="
+                    and ppc[-4].type == TokenType.GROUP and ppc[-4].open.value == "("):
+                ppc.pop()
+                ppc.pop()
+                ppc.pop()
+                arguments = ppc.pop()
+                ppc.append(
+                    LambdaFunctionToken(
+                        parent.code,
+                        arguments.start,
+                        parent.end,
+                        arguments,
+                        parent
+                    )
+                )
+
             if parent._temp == "block":
-                ppc = parent.parent.children
                 colon = ppc.pop()
                 ident = ppc.pop()
-                parent.parent.children.append(
+                ppc.append(
                     BlockIdentifierToken(
                         parent.code,
                         ident.start,
@@ -323,12 +365,11 @@ def group_tokens(tokens: List[Token]) -> List[Token]:
                     )
                 )
 
-            merge = None
             if (
                     parent.type == TokenType.SELECTOR
                     or parent.type == TokenType.SELECTOR_IDENTIFIER
             ):
-                merge = parent.parent.children[-1]
+                merge = ppc[-1]
                 merge.end = parent.end
                 merge.update_value()
                 if isinstance(merge, SelectorIdentifierToken):
@@ -367,6 +408,7 @@ def _tokenize_iterate(
         if (
                 len(tokens) > 1
                 and tokens[-1].value == ":"
+                and tokens[-1].end == index[0]
                 and tokens[-2].type == TokenType.IDENTIFIER
         ):
             token = SelectorIdentifierToken(

@@ -29,7 +29,7 @@ GRAY = "\x1b[90m"
 class RadonArgumentParser(ArgumentParser):
     def __init__(self):
         super().__init__()
-        self.add_argument("command", default="build", choices=["build", "watch"],
+        self.add_argument("command", nargs="?", default="build", choices=["build", "watch"],
                           help="The command to run (build or watch)")
         self.add_argument("-d", default=os.getcwd(), type=str, help="sets the working directory")
         self.prog = "radon"
@@ -44,7 +44,7 @@ class RadonArgumentParser(ArgumentParser):
 
 parser = RadonArgumentParser()
 args = parser.parse_args()
-cwd = args.d
+cwd_list = args.d.split("|")
 
 
 # real path
@@ -68,7 +68,7 @@ def clear():
 
 
 def read_config():
-    with open("./radon.json", "r") as file:
+    with open(f"./radon.json", "r") as file:
         res = json.loads(file.read())
         if "useLock" not in res:
             res["useLock"] = False
@@ -78,7 +78,7 @@ def read_config():
 def listdir_recursive(pt):
     for root, _, files in os.walk(pt):
         for file in files:
-            yield path.join(root, file)
+            yield pathr(root + "/" + file)
 
 
 def empty_dir_recursive(pt):
@@ -90,15 +90,15 @@ def empty_dir_recursive(pt):
             empty_dir_recursive(pathr(pt + "/../"))
 
 
-def build():
-    init()
+def build_dir():
+    init_dir()
 
     config = read_config()
 
     if not path.exists(config["main"]):
         return "The main file does not exist!"
 
-    with open(config["main"], "r") as file:
+    with open(pathr(config["main"]), "r") as file:
         code = file.read()
 
     try:
@@ -125,8 +125,8 @@ def build():
 
     lock = ""
 
-    if config["useLock"] and path.exists(f"{cwd}/radon.lock"):
-        with open(f"{cwd}/radon.lock", "r") as file:
+    if config["useLock"] and path.exists(f"./radon.lock"):
+        with open(f"./radon.lock", "r") as file:
             lock = file.read().strip("\n")
 
     rm_files = lock.split("\n") if lock else []
@@ -156,12 +156,22 @@ def build():
                 file.write(dp_files[file_name])
 
     if config["useLock"]:
-        with open(f"{cwd}/radon.lock", "w") as file:
+        with open(f"./radon.lock", "w") as file:
             file.write("\n".join(dp_files.keys()))
 
 
-def init():
-    if path.exists("./radon.json"):
+def build():
+    res = []
+    for cwd in cwd_list:
+        os.chdir(cwd)
+        s = build_dir()
+        if isinstance(s, str):
+            res.append(s)
+    return "\n".join(res) if len(res) > 0 else None
+
+
+def init_dir():
+    if path.exists(f"./radon.json"):
         return
     print(f"{BLUE}No config file found, generating radon.json")
 
@@ -218,11 +228,17 @@ def init():
 
     if not path.exists(main_file):
         with open(main_file, "w") as file:
-            file.write("print('Hello, world!')")
+            file.write("print(@a, 'Hello, world!')")
 
     print(f"{GREEN}Datapack's workplace is ready!{RESET}")
     build_for_watch()
     sys.exit(0)
+
+
+def init():
+    for cwd in cwd_list:
+        os.chdir(cwd)
+        init_dir()
 
 
 def watch_snapshot():
@@ -277,7 +293,7 @@ def main():
     global files_snapshot
     print(f"{YELLOW}Radon v{VERSION_RADON}{RESET}")
     print("")
-    print(f"{CYAN}Current Directory | {cwd}{RESET}")
+    print(f"{CYAN}Current Directory | {" | ".join(cwd_list)}{RESET}")
     print("")
 
     init()
@@ -293,12 +309,6 @@ def main():
 
         print(f"{GREEN}Datapack has been built!{GRAY} ({took:.5f}s){RESET}")
         sys.exit(0)
-
-    if args.command != "watch":
-        print(
-            f"{RED}Invalid argument! Usage: {CYAN}radon [build|watch]{RED} or just {CYAN}radon{RESET} to build"
-        )
-        sys.exit(1)
 
     files_snapshot = watch_snapshot()
 

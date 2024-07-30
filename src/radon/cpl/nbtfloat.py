@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .nbt import CplNBT
 from ..tokenizer import Token
 from ..utils import FLOAT_TYPE, FLOAT_PREC
@@ -23,11 +23,11 @@ class CplFloatNBT(CplNBT):
     def _get_index(self, ctx, index: CompileTimeValue):
         return None
 
-    def _get_slice(self, ctx, index1, index2, index3):
+    def _get_slice(self, ctx, index1, index2, index3, token):
         return None
 
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
-        return self.cache(ctx, force="score").call_index(ctx, index, arguments)
+    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
+        return self.cache(ctx, force="score")._call_index(ctx, index, arguments, token)
 
 
 from ._number import make_nbt_num

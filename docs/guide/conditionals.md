@@ -6,22 +6,22 @@ Examples:
 
 ```js
 if (a > b) {
-    print('a is greater than b')
+    print(@a, 'a is greater than b')
 }
 ```
 
 ```js
 if (a > b) {
-    print('a is greater than b')
+    print(@a, 'a is greater than b')
 } else if (a < b) {
-    print('a is less than b')
+    print(@a, 'a is less than b')
 } else {
-    print('a is equal to b')
+    print(@a, 'a is equal to b')
 }
 ```
 
 ```js
-if (a > b) print('a is greater than b')
-else if (a < b) print('a is less than b')
-else print('a is equal to b')
+if (a > b) print(@a, 'a is greater than b')
+else if (a < b) print(@a, 'a is less than b')
+else print(@a, 'a is equal to b')
 ```

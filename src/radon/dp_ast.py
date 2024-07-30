@@ -215,7 +215,8 @@ EXPR_EXPR = [
     TokenType.STRING_LITERAL,
     TokenType.IDENTIFIER,
     TokenType.SELECTOR_IDENTIFIER,
-    TokenType.SELECTOR
+    TokenType.SELECTOR,
+    TokenType.LAMBDA_FUNCTION
 ]
 
 EXPR_OP = list("+-*/%")
@@ -477,7 +478,7 @@ def chain_tokens_iterate(tokens: List[Token], index: List[int]) -> List[Token]:
         ):
             branch.append(tn)
             continue
-        if isinstance(tn, GroupToken) and tn.open.value == "[":
+        if isinstance(tn, GroupToken) and tn.open.value in {"[", "("}:
             branch.append(tn)
             continue
         index[0] -= 1
@@ -524,7 +525,15 @@ def make_expr(chains: List[List[Token]]) -> List[List[Token]]:
 
     Input: [Token('a'), Token('+'), Token('b')] or a + b
     Output: [Token('a'), Token('b'), Token('+')] or a b +
+
+    For more information: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
     """
+    new_chains = []
+    for index, chain in enumerate(chains):
+        if chain[0].type in ENDERS:
+            continue
+        new_chains.append(chain)
+    chains = new_chains
     if len(chains) == 0:
         return []
     stack = []

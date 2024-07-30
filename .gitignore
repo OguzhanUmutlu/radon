@@ -5,7 +5,6 @@ testing
 .vscode
 .stuff
 test.mcfunction
-test.bat
 dist
 nuitka-crash-report.xml
 main.spec
@@ -13,3 +12,6 @@ node_modules
 venv
 docs/.vitepress/cache
 docs/.vitepress/dist
+examples/*/data
+examples/*/pack.mcmeta
+examples/radon_test

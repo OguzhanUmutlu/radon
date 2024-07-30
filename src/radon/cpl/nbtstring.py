@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .nbt import CplNBT
 from .score import CplScore
 from ..tokenizer import Token
@@ -16,12 +16,6 @@ class CplStringNBT(CplNBT):
             eid = f"int_{get_expr_id()} __temp__"
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
-        return None
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
         return None
 
     def _set_add(self, ctx, cpl):

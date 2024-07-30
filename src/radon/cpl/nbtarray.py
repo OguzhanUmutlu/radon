@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .nbt import CplNBT, object_get_index_nbt, val_nbt
 from .tuple import CplTuple
 from ..error import raise_syntax_error
@@ -33,10 +33,7 @@ class CplArrayNBT(CplNBT):
 
         return object_get_index_nbt(ctx, self.unique_type.content, self, index)
 
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
+    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         if index == "pop":
             if len(arguments) != 0:
                 raise_syntax_error("Expected 0 arguments for <array>.pop()", self.token)
@@ -85,14 +82,6 @@ class CplArrayNBT(CplNBT):
             return None
         # TODO: array merging
         return None
-
-    '''def _sub(self, ctx, cpl):
-        if self.unique_type != cpl.unique_type:
-            return None
-        return self.cache(ctx, force="score")._sub(ctx, cpl)
-
-    def _eq_neq(self, ctx, cpl, is_eq):
-        return self.cache(ctx, force="score")._eq_neq(ctx, cpl, is_eq)'''
 
     def _and(self, ctx, cpl):
         return cpl

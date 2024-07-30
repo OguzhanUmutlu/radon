@@ -1,7 +1,7 @@
 from typing import Union, Any
 
 from ..tokenizer import Token
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 
 
 class CplLiteral(CompileTimeValue):

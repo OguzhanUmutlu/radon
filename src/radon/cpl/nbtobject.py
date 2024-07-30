@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .nbt import CplNBT, object_get_index_nbt, val_nbt
 from ..error import raise_syntax_error
 from ..tokenizer import Token
@@ -30,10 +30,7 @@ class CplObjectNBT(CplNBT):
 
         return object_get_index_nbt(ctx, content_type, self, index)
 
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
+    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         if self.unique_type.class_name is None:
             return None
         cls = self.unique_type.class_name

@@ -1,6 +1,6 @@
-from typing import Union, List
+from typing import Union
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from ..tokenizer import Token
 from ..utils import get_expr_id, CplDef, CplDefObject, CplDefArray
 
@@ -18,15 +18,6 @@ class CplNBT(CompileTimeValue):
             nbt_loc = f"storage temp _{get_expr_id()}"
         ctx.file.append(f"data modify {nbt_loc} set from {self.location}")
         return val_nbt(self.token, nbt_loc, self.unique_type)
-
-    def _get_index(self, ctx, index: CompileTimeValue):
-        return None
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
-        return None
 
     def _set(self, ctx, cpl):
         if self.unique_type != cpl.unique_type:

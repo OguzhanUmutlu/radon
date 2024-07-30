@@ -1,4 +1,4 @@
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import SELECTOR_TYPE, get_expr_id
@@ -15,7 +15,7 @@ class CplSelector(CompileTimeValue):
         return None
 
     def _cache(self, ctx, score_loc=None, nbt_loc=None, force=None, force_t=None):
-        raise_syntax_error("Selectors cannot be used in operations", self.token)
+        raise_syntax_error("Selectors cannot be stored", self.token)
 
     def get_data_str(self, ctx):
         raise_syntax_error("Selectors cannot be used in operations", self.token)

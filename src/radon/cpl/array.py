@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import CplDefArray
@@ -64,12 +64,6 @@ class CplArray(CompileTimeValue):
         if isinstance(index, CplFloat):
             return None
         return self.cache(ctx).get_index(ctx, index)
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
-        return None
 
     def _add(self, ctx, cpl):
         if isinstance(cpl, CplArray):

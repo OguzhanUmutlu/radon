@@ -47,7 +47,7 @@ You can define constants using the keyword `const`, and after the `const` keywor
 const a = 1 // This is pre-computed
 const int b = 1 // Still the same thing
 
-print(a)
+print(@a, a)
 
 // c = [] This would throw an error
 int[] c = [] // This is fine because now compiler knows it's values are of type int
@@ -87,11 +87,11 @@ myBool = true
 myEntityBool = @e[type=zombie] // Sets to true if there is a zombie, false otherwise
 
 if (myEntityBool) {
-  print("There's a zombie!")
+  print(@a, "There's a zombie!")
 }
 
 if (myEntityBool or myBool) {
-  print("There's a zombie or my bool is true!!")
+  print(@a, "There's a zombie or my bool is true!!")
 }
 ```
 

@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .float import CplFloat
 from .int import CplInt
 from .nbtobject import CplObjectNBT
@@ -11,8 +11,10 @@ from ..utils import CplDefObject
 
 
 class CplObject(CompileTimeValue):
-    def __init__(self, token, value, class_name):
-        # type: (Token | None, Dict[str, CompileTimeValue], str | None) -> None
+    def __init__(self, token=None, value=None, class_name=None):
+        # type: (Token | None, Dict[str, CompileTimeValue] | None, str | None) -> None
+        if value is None:
+            value = dict()
         self.unique_type: CplDefObject
         super().__init__(token)
         self.value = value
@@ -64,12 +66,6 @@ class CplObject(CompileTimeValue):
         if isinstance(index, CplInt) or isinstance(index, CplFloat) or isinstance(index, CplString):
             return self.value[str(index.value)]
         return self.cache(ctx).get_index(ctx, index)
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
-        return None
 
     def _add(self, ctx, cpl):
         if isinstance(cpl, CplObject):

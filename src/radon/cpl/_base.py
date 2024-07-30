@@ -37,8 +37,11 @@ class CompileTimeValue:
                 t1.code, t1.start, t2.end)
             assert False
 
-    def compute(self, ctx, op, cpl):
-        # type: (TranspilerContext, str, CompileTimeValue) -> CompileTimeValue
+    def compute(self, ctx, op, cpl, token):
+        # type: (TranspilerContext, str, CompileTimeValue, Token) -> CompileTimeValue
+        st = self.token
+        if not st:
+            self.token = token
         if op == "+":
             res = self._add(ctx, cpl)
         elif op == "-":
@@ -93,27 +96,25 @@ class CompileTimeValue:
             score_loc = f"{t}_{nbt_got_id or get_expr_id()} __temp__"
         return self._cache(ctx, score_loc, nbt_loc, force, force_t)
 
-    def compute_cache(self, ctx, op, cpl, score_loc=None, nbt_loc=None, force=None, is_reversed=False):
-        # type: (TranspilerContext, str, CompileTimeValue, str | None, str | None, str | None, bool) -> CompileTimeValue
-        if self.get_py_value() is not None:
-            return self.compute(ctx, op, cpl, is_reversed)
-        return self.cache(ctx, score_loc, nbt_loc, force).compute(ctx, op, cpl, is_reversed)
-
     def _get_index(self, ctx, index):
         # type: (TranspilerContext, CompileTimeValue) -> CompileTimeValue | None
         return None
 
-    def _get_slice(self, ctx, index1, index2, index3):
-        # type: (TranspilerContext, CompileTimeValue, CompileTimeValue, CompileTimeValue) -> CompileTimeValue | None
+    def _get_slice(self, ctx, index1, index2, index3, token):
+        # type: (TranspilerContext, CompileTimeValue, CompileTimeValue, CompileTimeValue, Token) -> CompileTimeValue | None
         return None
 
-    def _call_index(self, ctx, index, arguments):
-        # type: (TranspilerContext, str, List[CompileTimeValue]) -> CompileTimeValue | int | None
+    def _call_index(self, ctx, index, arguments, token):
+        # type: (TranspilerContext, str, List[CompileTimeValue], Token) -> CompileTimeValue | int | None
         return None
 
-    def get_index(self, ctx, index):
-        # type: (TranspilerContext, CompileTimeValue) -> CompileTimeValue
+    def get_index(self, ctx, index, token=None):
+        # type: (TranspilerContext, CompileTimeValue, Token | None) -> CompileTimeValue
+        st = self.token
+        if not st:
+            self.token = token
         r = self._get_index(ctx, index)
+        self.token = st
         if r is None:
             ind = index
             if isinstance(ind, CompileTimeValue):
@@ -121,22 +122,47 @@ class CompileTimeValue:
             raise_syntax_error(f"Cannot index into {self.unique_type} with {ind}", self.token)
         return r
 
-    def get_slice(self, ctx, index1, index2, index3):
-        # type: (TranspilerContext, CompileTimeValue, CompileTimeValue, CompileTimeValue) -> CompileTimeValue
-        r = self._get_slice(ctx, index1, index2, index3)
+    def get_slice(self, ctx, index1, index2, index3, token=None):
+        # type: (TranspilerContext, CompileTimeValue, CompileTimeValue, CompileTimeValue, Token | None) -> CompileTimeValue
+        st = self.token
+        if not st:
+            self.token = token
+        r = self._get_slice(ctx, index1, index2, index3, token)
+        self.token = st
         if r is None:
             ind = ":".join(map(lambda x: x.unique_type, [index1, index2, index3]))
             raise_syntax_error(f"Cannot index into {self.unique_type} with [{ind}]", self.token)
         return r
 
-    def call_index(self, ctx, index, arguments):
-        # type: (TranspilerContext, str, List[CompileTimeValue]) -> CompileTimeValue
-        r = self._call_index(ctx, index, arguments)
+    def call_index(self, ctx, index, arguments, token=None):
+        # type: (TranspilerContext, str, List[CompileTimeValue], Token | None) -> CompileTimeValue
+        st = self.token
+        if not st:
+            self.token = token
+        r = self._call_index(ctx, index, arguments, token)
+        self.token = st
         if r is None:
-            raise_syntax_error(f"Cannot call into {self.unique_type} with {index}", self.token)
+            raise_syntax_error(f"Cannot call into {self.unique_type} with {index}", token or self.token)
         if isinstance(r, int):
-            raise_syntax_error(f"Expected {r} arguments for {self.unique_type}.{index}()", self.token)
+            raise_syntax_error(f"Expected {r} arguments for {self.unique_type}.{index}()", token or self.token)
         return r
+
+    def call(self, ctx, arguments, token=None):
+        # type: (TranspilerContext, List[CompileTimeValue], Token | None) -> CompileTimeValue
+        st = self.token
+        if not st:
+            self.token = token
+        r = self._call(ctx, arguments)
+        self.token = st
+        if r is None:
+            raise_syntax_error(f"Cannot call into {self.unique_type}", token or self.token)
+        if isinstance(r, int):
+            raise_syntax_error(f"Expected {r} arguments for {self.unique_type}()", token or self.token)
+        return r
+
+    def _call(self, ctx, arguments):
+        # type: (TranspilerContext, List[CompileTimeValue]) -> CompileTimeValue | None
+        return None
 
     def _set(self, ctx, cpl):
         return None
@@ -207,7 +233,71 @@ class CompileTimeValue:
             self.token
         )
 
+    def __iadd__(self, other):
+        self._set_add(other[0], other[1])
+        return self
+
+    def __isub__(self, other):
+        self._set_sub(other[0], other[1])
+        return self
+
+    def __imul__(self, other):
+        self._set_mul(other[0], other[1])
+        return self
+
+    def __idiv__(self, other):
+        self._set_div(other[0], other[1])
+        return self
+
+    def __imod__(self, other):
+        self._set_mod(other[0], other[1])
+        return self
+
+    def __add__(self, other):
+        return self._add(other[0], other[1])
+
+    def __sub__(self, other):
+        return self._sub(other[0], other[1])
+
+    def __mul__(self, other):
+        return self._mul(other[0], other[1])
+
+    def __div__(self, other):
+        return self._div(other[0], other[1])
+
+    def __mod__(self, other):
+        return self._mod(other[0], other[1])
+
+    def __eq__(self, other):
+        return self._eq(other[0], other[1])
+
+    def __ne__(self, other):
+        return self._neq(other[0], other[1])
+
+    def __gt__(self, other):
+        return self._gt(other[0], other[1])
+
+    def __lt__(self, other):
+        return self._lt(other[0], other[1])
+
+    def __ge__(self, other):
+        return self._gte(other[0], other[1])
+
+    def __le__(self, other):
+        return self._lte(other[0], other[1])
+
+    def __and__(self, other):
+        return self._and(other[0], other[1])
+
+    def __call__(self, *args, **kwargs):
+        return self.call(*args, **kwargs)
+
+    def is_lit_eq(self, v):
+        return (isinstance(self, CplInt) or isinstance(self, CplFloat)) and self.value == v
+
 
 from .nbt import CplNBT
+from .int import CplInt
+from .float import CplFloat
 from .score import CplScore
 from ..transpiler import TranspilerContext

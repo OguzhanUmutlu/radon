@@ -7,7 +7,7 @@ FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC  # 2147483.647
 
 _expr_id = 0
 
-VERSION_RADON = "1.1.9"
+VERSION_RADON = "1.2.1"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:
@@ -163,6 +163,7 @@ class TokenType(Enum):
 
     GROUP = "group"
     FUNCTION_CALL = "function_call"
+    LAMBDA_FUNCTION = "lambda_function"
     SELECTOR = "selector"
     SELECTOR_IDENTIFIER = "selector_identifier"
     BLOCK_IDENTIFIER = "block_identifier"
@@ -183,21 +184,27 @@ class CplDef:
     def __init__(self, type: str):
         self.type = type
 
-    def __eq__(self, value: object) -> bool:
-        return str(self) == str(value)
+    def __eq__(self, other) -> bool:
+        return str(self) == str(other)
+
+    def __ne__(self, other):
+        return str(self) != str(other)
 
     def get_sample_value(self) -> str:
         return ""
 
 
 class VariableDeclaration:
-    def __init__(self, type: Any, constant: bool):
+    def __init__(self, name: str, type: Any, constant: bool, init_func=None, get_func=None):
+        self.name = name
         self.value = None
         if not type.__class__.__name__.startswith("CplDef"):
             self.value = type
             type = type.unique_type
         self.type = type
         self.constant = constant
+        self.init_func = init_func
+        self.get_func = get_func
 
 
 class CplDefInt(CplDef):
@@ -291,7 +298,29 @@ class CplDefSelector(CplDef):
         raise SyntaxError("Selectors cannot be sampled")
 
 
+class CplDefFunction(CplDef):
+    def __init__(self, arguments: List[CplDef], returns: CplDef | None):
+        super().__init__("string")
+        self.arguments = arguments
+        self.returns = returns
+
+    def __str__(self) -> str:
+        return "((" + ", ".join(map(str, self.arguments)) + ") => " + str(self.returns or "void") + ")"
+
+    def get_sample_value(self) -> str:
+        raise SyntaxError("Functions cannot be sampled")
+
+
 INT_TYPE = CplDefInt()
 FLOAT_TYPE = CplDefFloat()
 STRING_TYPE = CplDefString()
 SELECTOR_TYPE = CplDefSelector()
+
+str_counter = {}
+
+
+def get_str_count(s):
+    if s in str_counter:
+        return str_counter[s]
+    str_counter[s] = get_expr_id()
+    return str_counter[s]

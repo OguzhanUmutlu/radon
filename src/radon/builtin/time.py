@@ -1,39 +1,36 @@
+from typing import List
+
+from ..cpl._base import CompileTimeValue
 from ..cpl.score import CplScore
+from ..error import raise_syntax_error
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import FLOAT_PREC
 
-_ = 0
 
-
-def lib_time(ctx: TranspilerContext, _):
+def lib_time(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+    if len(args) != 0:
+        raise_syntax_error("time() takes no arguments", token)
     tr = ctx.transpiler
-    tr.files["__load__"].append("scoreboard players set __time__time__ 0")
-    tr.tickFile.append("scoreboard players add __time__time__ 1")
+    tr.files["__load__"].append("scoreboard players set __time__time__ __temp__ 0")
+    tr.tick_file.append("scoreboard players add __time__time__ __temp__ 1")
+    return CplScore(token, "__time__time__ __temp__", "int")
 
 
-def lib_ftime(ctx: TranspilerContext, _):
-    lib_time(ctx, _)
+def lib_ftime(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+    if len(args) != 0:
+        raise_syntax_error("ftime() takes no arguments", token)
     tr = ctx.transpiler
-    tr.files["__load__"].append(
-        f"scoreboard players set FTIME_FLOAT_PREC __temp__ {int(FLOAT_PREC / 20)}"
-    )
-    ctx.file.append(
-        f"scoreboard players operation __ftime__time__ *= FTIME_FLOAT_PREC __temp__"
-    )
+    tr.files["__load__"].append("scoreboard players set __ftime__time__ __temp__ 0")
+    tr.tick_file.append(f"scoreboard players add __ftime__time__ __temp__ {int(FLOAT_PREC / 20)}")
+    return CplScore(token, "__ftime__time__ __temp__", "float")
 
 
 add_lib(FunctionDeclaration(
-    type="python",
+    type="python-cpl",
     name="time",
-    returns=CplScore(None, "__time__time__ --temp-", "int"),
-    arguments=[],
     function=lib_time,
-))
-
-add_lib(FunctionDeclaration(
-    type="python",
+), FunctionDeclaration(
+    type="python-cpl",
     name="ftime",
-    returns=CplScore(None, "__ftime__time__ --temp-", "float"),
-    arguments=[],
     function=lib_ftime,
 ))

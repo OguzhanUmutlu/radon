@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from .float import CplFloat
 from .int import CplInt
 from .string import CplString
@@ -40,11 +40,8 @@ class CplTuple(CompileTimeValue):
             return None
         return None
 
-    def _get_slice(self, ctx, index1, index2, index3):
+    def _get_slice(self, ctx, index1, index2, index3, token):
         # TODO: this
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
         return None
 
     def tellraw_object(self, ctx):

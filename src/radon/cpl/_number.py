@@ -3,6 +3,7 @@ from .int import CplInt
 from .nbtfloat import CplFloatNBT
 from .nbtint import CplIntNBT
 from .score import CplScore
+from ..error import raise_syntax_error
 from ..utils import get_expr_id, basic_cmp, FLOAT_PREC, inv_cmp
 
 
@@ -11,6 +12,8 @@ def num_add(self, ctx, cpl):
         if isinstance(self, CplInt) and isinstance(cpl, CplInt):
             return CplInt(self.token, self.value + cpl.value)
         return CplFloat(self.token, self.value + cpl.value)
+    if self.value == 0:
+        return cpl
     return self.cache(ctx)._add(ctx, cpl)
 
 
@@ -27,6 +30,10 @@ def num_mul(self, ctx, cpl):
         if isinstance(self, CplInt) and isinstance(cpl, CplInt):
             return CplInt(self.token, self.value * cpl.value)
         return CplFloat(self.token, self.value * cpl.value)
+    if self.value == 0:
+        return self
+    if self.value == 1:
+        return cpl
     return self.cache(ctx)._mul(ctx, cpl)
 
 
@@ -35,6 +42,8 @@ def num_div(self, ctx, cpl):
         if isinstance(self, CplInt) and isinstance(cpl, CplInt):
             return CplInt(self.token, self.value / cpl.value)
         return CplFloat(self.token, self.value / cpl.value)
+    if self.value == 0:
+        raise_syntax_error("Division by zero", self.token)
     return self.cache(ctx)._div(ctx, cpl)
 
 
@@ -43,6 +52,8 @@ def num_mod(self, ctx, cpl):
         if isinstance(self, CplInt) and isinstance(cpl, CplInt):
             return CplInt(self.token, self.value % cpl.value)
         return CplFloat(self.token, self.value % cpl.value)
+    if self.value == 0:
+        raise_syntax_error("Modulo by zero", self.token)
     return self.cache(ctx)._mod(ctx, cpl)
 
 
@@ -116,26 +127,40 @@ def num_or(self, _, cpl):
 
 
 def nbt_set_add(self, ctx, cpl):
+    if cpl.is_lit_eq(0):
+        return self
     nbt_add(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
     return self
 
 
 def nbt_set_sub(self, ctx, cpl):
+    if cpl.is_lit_eq(0):
+        return self
     nbt_sub(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
     return self
 
 
 def nbt_set_mul(self, ctx, cpl):
+    if cpl.is_lit_eq(1):
+        return self
     nbt_mul(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
     return self
 
 
 def nbt_set_div(self, ctx, cpl):
+    if cpl.is_lit_eq(0):
+        raise_syntax_error("Division by zero", self.token)
+    if cpl.is_lit_eq(1):
+        return self
     nbt_div(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
     return self
 
 
 def nbt_set_mod(self, ctx, cpl):
+    if cpl.is_lit_eq(0):
+        raise_syntax_error("Modulo by zero", self.token)
+    if cpl.is_lit_eq(1) and self.unique_type.type == "int":
+        return self
     nbt_mod(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
     return self
 
@@ -143,30 +168,46 @@ def nbt_set_mod(self, ctx, cpl):
 def nbt_add(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
+    if cpl.is_lit_eq(0):
+        return self
     return self.cache(ctx, force="score")._add(ctx, cpl)
 
 
 def nbt_sub(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
+    if cpl.is_lit_eq(0):
+        return self
     return self.cache(ctx, force="score")._sub(ctx, cpl)
 
 
 def nbt_mul(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
+    if cpl.is_lit_eq(1):
+        return self
+    if cpl.is_lit_eq(0):
+        return cpl
     return self.cache(ctx, force="score")._mul(ctx, cpl)
 
 
 def nbt_div(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
+    if cpl.is_lit_eq(0):
+        raise_syntax_error("Division by zero", self.token)
+    if cpl.is_lit_eq(1):
+        return self
     return self.cache(ctx, force="score")._div(ctx, cpl)
 
 
 def nbt_mod(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
+    if cpl.is_lit_eq(0):
+        raise_syntax_error("Modulo by zero", self.token)
+    if cpl.is_lit_eq(1) and self.unique_type.type == "int":
+        return self
     return self.cache(ctx, force="score")._mod(ctx, cpl)
 
 

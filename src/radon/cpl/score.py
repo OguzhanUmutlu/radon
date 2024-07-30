@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import INT_TYPE, get_expr_id, FLOAT_PREC, FLOAT_TYPE, inv_cmp
@@ -78,18 +78,12 @@ class CplScore(CompileTimeValue):
             score._force_type(ctx, force_t)
         return score
 
-    def _get_index(self, ctx, index: CompileTimeValue):
-        return None
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
+    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         t = self.unique_type.type
         if index == "sqrt":
-            return ctx.transpiler.run_function_with_cpl(ctx, "isqrt" if t == "int" else "sqrt", [self], self.token)
+            return ctx.transpiler.builtin_vars.call_index(ctx, "isqrt" if t == "int" else "sqrt", [self], token)
         if index == "cbrt":
-            return ctx.transpiler.run_function_with_cpl(ctx, "cbrt", [self.as_float(ctx)], self.token)
+            return ctx.transpiler.builtin_vars["Math"].value.call_index(ctx, "cbrt", [self], token)
         if index == "int":
             if len(arguments) > 0:
                 raise_syntax_error("Expected 0 arguments for <score>.int()", self.token)
@@ -136,6 +130,8 @@ class CplScore(CompileTimeValue):
         return self
 
     def _set_add(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            return self
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             ctx.file.append(f"scoreboard players add {self.location} {self.__score_help(cpl)}")
             return self
@@ -151,6 +147,8 @@ class CplScore(CompileTimeValue):
         return self._set_add(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
 
     def _set_sub(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            return self
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             ctx.file.append(f"scoreboard players remove {self.location} {self.__score_help(cpl)}")
             return self
@@ -166,6 +164,8 @@ class CplScore(CompileTimeValue):
         return self._set_sub(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
 
     def _set_mul(self, ctx, cpl):
+        if cpl.is_lit_eq(1):
+            return self
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self._set_mul(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
         if isinstance(cpl, CplScore):
@@ -178,6 +178,10 @@ class CplScore(CompileTimeValue):
         return self._set_mul(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
 
     def _set_div(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            raise_syntax_error("Divide by zero", self.token)
+        if cpl.is_lit_eq(1):
+            return self
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self._set_div(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
         if isinstance(cpl, CplScore):
@@ -190,6 +194,10 @@ class CplScore(CompileTimeValue):
         return self._set_div(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
 
     def _set_mod(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            raise_syntax_error("Modulo by zero", self.token)
+        if cpl.is_lit_eq(1) and self.unique_type.type == "int":
+            return self
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self._set_mod(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
         if isinstance(cpl, CplScore):
@@ -204,18 +212,34 @@ class CplScore(CompileTimeValue):
         return self._set_mod(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
 
     def _add(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            return self
         return self.cache(ctx)._set_add(ctx, cpl)
 
     def _sub(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            return self
         return self.cache(ctx)._set_sub(ctx, cpl)
 
     def _mul(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            return cpl
+        if cpl.is_lit_eq(1):
+            return self
         return self.cache(ctx)._set_mul(ctx, cpl)
 
     def _div(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            raise_syntax_error("Divide by zero", self.token)
+        if cpl.is_lit_eq(1):
+            return cpl
         return self.cache(ctx)._set_div(ctx, cpl)
 
     def _mod(self, ctx, cpl):
+        if cpl.is_lit_eq(0):
+            raise_syntax_error("Modulo by zero", self.token)
+        if cpl.is_lit_eq(1) and self.unique_type.type == "int":
+            return cpl
         return self.cache(ctx)._set_mod(ctx, cpl)
 
     def _eq_neq(self, ctx, cpl, is_eq):

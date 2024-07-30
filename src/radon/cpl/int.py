@@ -2,7 +2,7 @@ from math import isqrt
 from typing import List
 
 from ._literal import CplLiteral
-from .base import CompileTimeValue
+from ._base import CompileTimeValue
 from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import INT_TYPE, TokenType, FLOAT_PREC
@@ -39,13 +39,7 @@ class CplInt(CplLiteral):
     def get_data_str(self, ctx):
         return f"value {self.value}"
 
-    def _get_index(self, ctx, index: CompileTimeValue):
-        return None
-
-    def _get_slice(self, ctx, index1, index2, index3):
-        return None
-
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue]):
+    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         if index == "toString":
             if len(arguments) > 0:
                 return 0

@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from importlib import util
 from typing import Any, Dict, List, Union, Literal
 
 from .dp_ast import (
@@ -35,17 +36,16 @@ from .tokenizer import (
     CMP_COMBINE_OP,
     cpl_def_from_tokens,
     split_tokens,
-    tokenize
+    tokenize, LambdaFunctionToken
 )
 from .utils import (
     INT_TYPE,
     CplDef,
     VariableDeclaration,
     TokenType,
-    FLOAT_PREC,
     get_expr_id,
     INT_LIMIT,
-    FLOAT_LIMIT, CplDefArray, reset_expr_id
+    FLOAT_LIMIT, CplDefArray, reset_expr_id, FLOAT_PREC, CplDefFunction
 )
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -93,6 +93,10 @@ def split_cmp(expr: List[Token]):
     return spl
 
 
+def split_fn_args(tokens: List[Token]):
+    return list(map(lambda x: chain_tokens(x), split_tokens(tokens, ",")))
+
+
 class FunctionArgument:
     def __init__(self, name, store, store_via):
         # type: (str, CplScore | CplNBT, str) -> None
@@ -108,13 +112,6 @@ class LoopDeclaration:
         self.file = file
         self.file_path = file_path
         self.continue_ = continue_
-
-
-def args_to_str(arguments):
-    arg_s = []
-    for arg in arguments:
-        arg_s.append(str(arg.unique_type))
-    return ", ".join(arg_s)
 
 
 class FunctionDeclaration:
@@ -135,7 +132,6 @@ class FunctionDeclaration:
         self.file_name = file_name
         self.returns = returns
         self.arguments: List[FunctionArgument] = arguments
-        self.argumentsStr = args_to_str(arguments)
         self.function = function
         self.class_name = class_name
 
@@ -173,7 +169,7 @@ class TranspilerContext:
         self.class_name = class_name
 
 
-from .cpl.base import CompileTimeValue
+from .cpl._base import CompileTimeValue
 from .cpl.int import CplInt
 from .cpl.float import CplFloat
 from .cpl.string import CplString
@@ -194,30 +190,57 @@ def _type_to_cpl(
     return CplScore(token, score_loc, type.type)
 
 
-TRUE_VALUE = CplScore(Token("true", TokenType.IDENTIFIER, 0, 4), "true global", "int")
-FALSE_VALUE = CplScore(
-    Token("false", TokenType.IDENTIFIER, 0, 5), "false global", "int"
-)
-NULL_VALUE = CplScore(Token("null", TokenType.IDENTIFIER, 0, 4), "null global", "int")
-
-builtin: Dict[str, List[FunctionDeclaration]] = {}
+builtin_fns: Dict[str, List[FunctionDeclaration]] = {}
+builtin_vars: Dict[str, VariableDeclaration] = {}
 
 
-def add_lib(lib):
-    if lib.name in builtin:
-        builtin[lib.name].append(lib)
-    else:
-        builtin[lib.name] = [lib]
+def add_lib(*libs):
+    for lib in libs:
+        if isinstance(lib, FunctionDeclaration):
+            if lib.name in builtin_fns:
+                builtin_fns[lib.name].append(lib)
+            else:
+                builtin_fns[lib.name] = [lib]
+        elif isinstance(lib, VariableDeclaration):
+            builtin_vars[lib.name] = lib
 
 
-from .builtin.math import _ as ___0
-from .builtin.print import _ as ___1
-from .builtin.pyeval import _ as ___2
-from .builtin.time import _ as ___3
-from .builtin.swap import _ as ___4
+radon_module_id = 0
 
-# IF YOU HATE PYTHON AND YOU KNOW IT CLAP YOUR HANDS! 👏 👏 👏
-____ = ___0 + ___1 + ___2 + ___3 + ___4
+
+def import_module_from_path(file_path):
+    global radon_module_id
+    radon_module_id += 1
+    module_name = f"radon__{radon_module_id}"
+    spec = util.spec_from_file_location(module_name, file_path)
+    module = util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+# add lib
+from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe
+
+_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe]
+
+
+def get_fn_macro_obj(ctx: TranspilerContext):
+    if not ctx.function:
+        return ""
+    d = []
+    has_macro = False
+    for arg in ctx.function.arguments:
+        if arg.store_via == "macro":
+            has_macro = True
+            d.append(f"'{arg.name}':'$({arg.name})'")
+    if not has_macro:
+        return ""
+    return "{" + ",".join(d) + "}"
+
+
+def _get_def(v: CompileTimeValue | CplDef):
+    return v if isinstance(v, CplDef) else v.unique_type
 
 
 class Transpiler:
@@ -225,6 +248,7 @@ class Transpiler:
                  pack_description: str = "", pack_format: int = 48, main_dir: str = "./") -> None:
         reset_expr_id()
         self.files = dict()
+        self.dp_files = dict()
         self.pack_namespace = pack_namespace
         self.pack_description = pack_description
         self.pack_format = pack_format
@@ -236,30 +260,19 @@ class Transpiler:
         self.init_libs = []
         self.data = dict()
         self.main_file = []
+        self.tick_file = []
         self.tempFiles: Dict[str, str] = dict()
+        self.builtin_fns = builtin_fns
+        self.builtin_vars = builtin_vars
+        self.s = "" if self.pack_format >= 48 else "s"
 
         if len(statements) == 0:
             self.files = {}
             return
         self.macros = macros
-        load_file = [
-            "# Setup #",
-            "",
-            'scoreboard objectives add __temp__ dummy "__temp__"',
-            'scoreboard objectives add global dummy "global"',
-            'scoreboard objectives add __break__ dummy "__break__"',
-            'scoreboard objectives add __continue__ dummy "__continue__"',
-            "scoreboard players set null __temp__ 0",
-            "scoreboard players set FLOAT_PREC __temp__ " + str(FLOAT_PREC),
-            "scoreboard players set true global 1",
-            "scoreboard players set false global 0",
-            "scoreboard players set null global 0",
-        ]
+        load_file = []
         self.files["__load__"] = load_file
         self.load_file = load_file
-        self.variables["false"] = VariableDeclaration(INT_TYPE, False)
-        self.variables["true"] = VariableDeclaration(INT_TYPE, False)
-        self.variables["null"] = VariableDeclaration(INT_TYPE, False)
         main_file = []
         self.main_file = main_file
         self._transpile(
@@ -271,10 +284,16 @@ class Transpiler:
                 loop=None),
             statements
         )
-        load_file.append("")
-        load_file.append("# Main File #")
-        load_file.append("")
-        load_file += main_file
+        load_file.extend(main_file)
+
+        if "tick" not in self.files:
+            if self.tick_file:
+                self.files["tick"] = self.tick_file
+        else:
+            self.tick_file += self.files["tick"]
+
+        if len(self.variables.keys()) > 0:
+            self.load_file.insert(0, 'scoreboard objectives add global dummy "global"')
 
         # remove the lines after immediate returns
         for file in self.files:
@@ -285,12 +304,19 @@ class Transpiler:
                 continue
             index = 0
             for index, line in enumerate(lines):
+                if file is not self.load_file:
+                    if "__temp__" in line and "__temp__" not in self.data:
+                        self.data["__temp__"] = True
+                        self.load_file.insert(0, 'scoreboard objectives add __temp__ dummy "__temp__"')
+                    if "FLOAT_PREC __temp__" in line and "float_prec" not in self.data:
+                        self.data["float_prec"] = True
+                        self.load_file.append(f"scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}")
                 if line.startswith("return"):
                     break
             self.files[file] = lines[: index + 1]
 
     def get_datapack_files(self):
-        fn_folder = "function" if self.pack_format >= 48 else "functions"
+        fn_folder = "function" + self.s
         dp_files = dict()
         for file in self.files:
             dp_files[f"data/{self.pack_namespace}/{fn_folder}/{file}.mcfunction"] = "\n".join(self.files[file])
@@ -305,14 +331,12 @@ class Transpiler:
                 "values": [f"{self.pack_namespace}:__load__"]
             }, indent=2)
         if "tick" in self.files:
-            with open(
-                    f"data/minecraft/tags/{fn_folder}/tick.json", "w"
-            ) as file:
-                file.write(
-                    json.dumps(
-                        {"values": [f"{self.pack_namespace}:tick"]}, indent=2
-                    )
-                )
+            dp_files[f"data/minecraft/tags/{fn_folder}/tick.json"] = json.dumps(
+                {
+                    "values": [f"{self.pack_namespace}:tick"]
+                }, indent=2)
+        for f in self.dp_files:
+            dp_files[f"data/{self.pack_namespace}/{f}"] = self.dp_files[f]
         return dp_files
 
     def get_temp_file_name(self, content: str | List[str]):
@@ -325,363 +349,417 @@ class Transpiler:
         self.files[file_name] = content.split("\n")
         return file_name
 
-    def _transpile(self, ctx: TranspilerContext, statements: List[Statement]):
-        for statement in statements:
-            if isinstance(statement, DefineClassStatement):
-                if ctx.function or ctx.loop:
-                    raise_syntax_error(
-                        "Classes should be declared in the main scope", statement
-                    )
-                name = statement.name.value
-                if name in self.classes or name in self.functions:
-                    raise_syntax_error(f"Class {name} is already defined", statement)
-                base_object = CplObject(statement.name, dict(), name)
-                for (attr_name, attr_expr) in statement.attributes:
-                    cpl = self.tokens_to_cpl(ctx, attr_expr)
-                    base_object.value[attr_name] = cpl
-                    base_object.unique_type.content[attr_name] = cpl.unique_type
-                sample: CplObjectNBT = base_object.cache(ctx, nbt_loc=f"storage class_sample {name}",  # type: ignore
-                                                         force="nbt")
+    def get_all_fn_by_name(self, name):
+        ls = []
+        for fn in self.functions:
+            if fn.name == name:
+                ls.append(fn)
+        return ls
 
-                class_ctx = TranspilerContext(
+    def check_args(self, args1, args2, base):
+        if len(args1) != len(args2):
+            return False
+        for index, arg1 in enumerate(args1):
+            arg2 = args2[index]
+            if isinstance(_get_def(arg2), CplDefFunction) and isinstance(arg1, CplString) and arg1.is_fn_reference:
+                temp = arg1
+                arg1 = arg2
+                arg2 = temp
+            t1 = _get_def(arg1)
+            t2 = _get_def(arg2)
+            if isinstance(t1, CplDefFunction) and isinstance(arg2, CplString) and arg2.is_fn_reference:
+                arg_fn = self.get_fn(arg2.value, t1.arguments, base)
+                if not arg_fn:
+                    return False
+                if arg_fn.returns == "auto":
+                    raise_syntax_error("Cannot use function as a value before the return type is not determined", base)
+                if arg_fn.returns == "void" and t1.returns is None:
+                    continue
+                if arg_fn.returns.unique_type != t1.returns:
+                    continue
+                continue
+            if t1 != t2:
+                return False
+        return True
+
+    def assert_args(self, name, args1, args2, base):
+        if not self.check_args(args1, args2, base):
+            raise_syntax_error(
+                f"Invalid arguments. Expected usage: {name}({', '.join(map(str, args1))})" + ", but got: " + name + "",
+                base)
+
+    def get_fn(self, name, arguments: List[CompileTimeValue | CplDef], base) -> FunctionDeclaration | None:
+        for fn in self.functions:
+            if fn.name == name and self.check_args(fn.arguments, arguments, base):
+                return fn
+        return None
+
+    def fn_exists(self, name):
+        for fn in self.functions:
+            if fn.name == name:
+                return True
+        return False
+
+    def _transpile_statement(self, ctx: TranspilerContext, statement: Statement):
+        if isinstance(statement, DefineClassStatement):
+            if ctx.function or ctx.loop:
+                raise_syntax_error(
+                    "Classes should be declared in the main scope", statement
+                )
+            name = statement.name.value
+            if name in self.classes or self.fn_exists(name):
+                raise_syntax_error(f"Class {name} is already defined", statement)
+            base_object = CplObject(statement.name, dict(), name)
+            for (attr_name, attr_expr) in statement.attributes:
+                cpl = self.tokens_to_cpl(ctx, attr_expr)
+                base_object.value[attr_name] = cpl
+                base_object.unique_type.content[attr_name] = cpl.unique_type
+            sample: CplObjectNBT = base_object.cache(ctx, nbt_loc=f"storage class_sample {name}",  # type: ignore
+                                                     force="nbt")
+
+            class_ctx = TranspilerContext(
+                transpiler=self,
+                file_name=ctx.file_name,
+                file=ctx.file,
+                function=None,
+                loop=None,
+                class_name=name
+            )
+
+            methods = []
+            has_init = False
+            cls = ClassDeclaration(name, base_object, methods, sample)
+            self.classes[name] = cls
+            for mt in statement.methods:
+                if mt.name.value == name:
+                    has_init = True
+                args = self._chains_to_args(mt.arguments)
+                fn_dec = FunctionDeclaration(
+                    type="radon",
+                    name=name + "." + mt.name.value,
+                    returns="auto",
+                    arguments=args,
+                    file_name=statement.name.value,
+                    function="replace me"
+                )
+                self.functions.append(fn_dec)
+                methods.append(fn_dec)
+
+            new_methods = []
+
+            for mt in statement.methods:
+                self._transpile_statement(class_ctx, mt)
+                new_methods.append(self.functions[-1])
+            cls.methods = new_methods
+
+            if not has_init:
+                self._transpile(class_ctx, parse(
+                    tokenize("fn " + name + "() {}")[0],
+                    [], list(self.classes.keys())))
+                methods.append(self.functions[-1])
+            return
+        if isinstance(statement, ImportStatement):
+            raise_syntax_error("Imports are not yet implemented.", statement)
+            if statement.as_ is None:
+                pass
+            else:
+                # TODO: add imports
+                """save = str(get_expr_id())
+                path = statement.path.value[1:-1]
+
+                self.add_mcfunction_file(save, path)
+                self.functions.append(
+                    FunctionDeclaration(
+                        type="mcfunction",
+                        name=statement._as.value,
+                        file_name=save,
+                        returns="int",
+                        arguments=[],
+                    )
+                )"""
+            return True
+        if isinstance(statement, ScheduleStatement):
+            file_name = self._run_safe("__schedule__", statement.body, ctx)
+            ctx.file.append(
+                f"schedule function {self.pack_namespace}:{file_name} {statement.time.value} replace"
+            )
+            _return_safe(ctx)
+            return True
+        if statement.type == StatementType.BREAK:
+            if not ctx.loop:
+                raise_syntax_error("Cannot use break outside of loop", statement)
+            if ctx.file is ctx.loop.file:
+                ctx.file.append("return 0")
+            else:
+                loop_id = ctx.loop.eid
+                ctx.file.append(f"scoreboard players set __break__{loop_id} __temp__ 1")
+                ctx.file.append(f"return 0")
+            return True
+        if isinstance(statement, ContinueStatement):
+            if not ctx.loop:
+                raise_syntax_error("Cannot use continue outside of loop", statement)
+            if ctx.file is ctx.loop.file:
+                ctx.file.append(ctx.loop.continue_)
+                ctx.file.append("return 0")
+            else:
+                loop_id = ctx.loop.eid
+                ctx.file.append(f"scoreboard players set __continue__{loop_id} __temp__ 1")
+                ctx.file.append(f"return 0")
+            return True
+        if isinstance(statement, LoopStatement):
+            file_name = self._run_safe(
+                "__loop__",
+                statement.body,
+                TranspilerContext(
                     transpiler=self,
                     file_name=ctx.file_name,
                     file=ctx.file,
-                    function=None,
-                    loop=None,
-                    class_name=name
-                )
-
-                methods = []
-                has_init = False
-                cls = ClassDeclaration(name, base_object, methods, sample)
-                self.classes[name] = cls
-                for mt in statement.methods:
-                    if mt.name.value == name:
-                        has_init = True
-                    args = self._chains_to_args(mt.arguments)
-                    fn_dec = FunctionDeclaration(
-                        type="radon",
-                        name=name + "." + mt.name.value,
-                        returns="auto",
-                        arguments=args,
-                        file_name=statement.name.value,
-                        function="replace me"
-                    )
-                    self.functions.append(fn_dec)
-                    methods.append(fn_dec)
-
-                new_methods = []
-
-                for mt in statement.methods:
-                    self._transpile(class_ctx, [mt])
-                    new_methods.append(self.functions[-1])
-                cls.methods = new_methods
-
-                if not has_init:
-                    self._transpile(class_ctx, parse(
-                        tokenize("fn " + name + "() {}")[0],
-                        [], list(self.classes.keys())))
-                    methods.append(self.functions[-1])
-                continue
-            if isinstance(statement, ImportStatement):
-                raise_syntax_error("Imports are not yet implemented.", statement)
-                if statement.as_ is None:
-                    pass
-                else:
-                    # TODO: add imports
-                    """save = str(get_expr_id())
-                    path = statement.path.value[1:-1]
-                    
-                    self.add_mcfunction_file(save, path)
-                    self.functions.append(
-                        FunctionDeclaration(
-                            type="mcfunction",
-                            name=statement._as.value,
-                            file_name=save,
-                            returns="int",
-                            arguments=[],
-                        )
-                    )"""
-                continue
-            if isinstance(statement, ScheduleStatement):
-                file_name = self._run_safe("__schedule__", statement.body, ctx)
-                ctx.file.append(
-                    f"schedule function {self.pack_namespace}:{file_name} {statement.time.value} replace"
-                )
-                _return_safe(ctx)
-                continue
-            if statement.type == StatementType.BREAK:
-                if not ctx.loop:
-                    raise_syntax_error("Cannot use break outside of loop", statement)
-                if ctx.file is ctx.loop.file:
-                    ctx.file.append("return 0")
-                else:
-                    loop_id = ctx.loop.eid
-                    ctx.file.append(f"scoreboard players set {loop_id} __break__ 1")
-                    ctx.file.append(f"return 0")
-                continue
-            if isinstance(statement, ContinueStatement):
-                if not ctx.loop:
-                    raise_syntax_error("Cannot use continue outside of loop", statement)
-                if ctx.file is ctx.loop.file:
-                    ctx.file.append(ctx.loop.continue_)
-                    ctx.file.append("return 0")
-                else:
-                    loop_id = ctx.loop.eid
-                    ctx.file.append(f"scoreboard players set {loop_id} __continue__ 1")
-                    ctx.file.append(f"return 0")
-                continue
-            if isinstance(statement, LoopStatement):
-                file_name = self._run_safe(
-                    "__loop__",
-                    statement.body,
-                    TranspilerContext(
-                        transpiler=self,
-                        file_name=ctx.file_name,
-                        file=ctx.file,
-                        function=ctx.function,
-                        loop=statement)
-                )
-                ctx.file.append(f"function {self.pack_namespace}:{file_name}")
-                loop_file = self.files[file_name]
-                loop_id = int(file_name.split("/")[-1])
-                loop_file.insert(0, f"scoreboard players set {loop_id} __break__ 0")
-                loop_file.insert(0, f"scoreboard players set {loop_id} __continue__ 0")
-                loop_c = self.loops[loop_id]
-                loop_file.append(loop_c.continue_)
-                continue
-            if isinstance(statement, IfFlowStatement):
-                has_if = len(statement.body) != 0
-                has_else = statement.elseBody and len(statement.elseBody) != 0
-                if not has_if and not has_else:
-                    continue
-                resp = self.tokens_to_cpl(ctx, statement.condition)
+                    function=ctx.function,
+                    loop=statement)
+            )
+            mac = get_fn_macro_obj(ctx)
+            ctx.file.append(f"{'$' if mac else ''}function {self.pack_namespace}:{file_name}" + mac)
+            loop_file = self.files[file_name]
+            loop_id = int(file_name.split("/")[-1])
+            loop_file.insert(0, f"scoreboard players set __break__{loop_id} __temp__ 0")
+            loop_file.insert(0, f"scoreboard players set __continue__{loop_id} __temp__ 0")
+            loop_c = self.loops[loop_id]
+            loop_file.append(loop_c.continue_)
+            return True
+        if isinstance(statement, IfFlowStatement):
+            has_if = len(statement.body) != 0
+            has_else = statement.elseBody and len(statement.elseBody) != 0
+            if not has_if and not has_else:
+                return True
+            resp = self.tokens_to_cpl(ctx, statement.condition)
+            if (
+                    isinstance(resp, CplInt)
+                    or isinstance(resp, CplFloat)
+                    or (resp.unique_type.type not in {"int", "float"} and not isinstance(resp, CplSelector))):
+                is_true = (not isinstance(resp, CplInt) and not isinstance(resp, CplFloat)) or resp.value != 0
+                if is_true:
+                    if not has_if:
+                        return True
+                    self._transpile(ctx, statement.body)
+                elif (
+                        has_else and statement.elseBody
+                ):  # I know this is bad, but the linter wants it (statement.elseBody)
+                    self._transpile(ctx, statement.elseBody)
+                return True
+            if isinstance(resp, CplNBT):
+                resp = resp.cache(ctx, force="score")
+            if isinstance(resp, CplScore):
+                if_cmd = f"execute unless score {resp.location} matches 0..0 run "
+                unless_cmd = f"execute if score {resp.location} matches 0..0 run "
+            elif isinstance(resp, CplSelector):
+                if_cmd = f"execute if entity {resp.value} run "
+                unless_cmd = f"execute unless entity {resp.value} run "
+            else:
+                raise SyntaxError("Invalid condition")
+            has_one = (has_if or has_else) and (not has_if or not has_else)
+            if has_one:
+                one_body = statement.body if has_if else statement.elseBody
+                i_cmd = if_cmd if has_if else unless_cmd
                 if (
-                        isinstance(resp, CplInt)
-                        or isinstance(resp, CplFloat)
-                        or (resp.unique_type.type not in {"int", "float"} and not isinstance(resp, CplSelector))):
-                    is_true = (not isinstance(resp, CplInt) and not isinstance(resp, CplFloat)) or resp.value != 0
-                    if is_true:
-                        if not has_if:
-                            continue
-                        self._transpile(ctx, statement.body)
-                    elif (
-                            has_else and statement.elseBody
-                    ):  # I know this is bad, but the linter wants it (statement.elseBody)
-                        self._transpile(ctx, statement.elseBody)
-                    continue
-                if isinstance(resp, CplNBT):
-                    resp = resp.cache(ctx, force="score")
-                if isinstance(resp, CplScore):
-                    if_cmd = f"execute unless score {resp.location} matches 0..0 run "
-                    unless_cmd = f"execute if score {resp.location} matches 0..0 run "
-                elif isinstance(resp, CplSelector):
-                    if_cmd = f"execute if entity {resp.value} run "
-                    unless_cmd = f"execute unless entity {resp.value} run "
-                else:
-                    raise SyntaxError("Invalid condition")
-                has_one = (has_if or has_else) and (not has_if or not has_else)
-                if has_one:
-                    one_body = statement.body if has_if else statement.elseBody
-                    i_cmd = if_cmd if has_if else unless_cmd
-                    if (
-                            ctx.loop
-                            and one_body
-                            and ctx.loop.file is ctx.file
-                            and len(one_body) == 1
-                            and one_body[0].type == StatementType.BREAK
-                    ):
-                        ctx.file.append(f"{i_cmd}return 0")
-                        continue
+                        ctx.loop
+                        and one_body
+                        and ctx.loop.file is ctx.file
+                        and len(one_body) == 1
+                        and one_body[0].type == StatementType.BREAK
+                ):
+                    ctx.file.append(f"{i_cmd}return 0")
+                    return True
 
-                if has_if:
-                    if_name = self._run_safe("__if__", statement.body, ctx)
-                    ctx.file.append(f"{if_cmd}function {self.pack_namespace}:{if_name}")
-                if has_else:
-                    else_name = self._run_safe("__else__", statement.elseBody, ctx)
-                    ctx.file.append(f"{unless_cmd}function {self.pack_namespace}:{else_name}")
-                _return_safe(ctx)
-                continue
-            if isinstance(statement, InlineStatement):
-                expr_tokens = statement.exprTokens
-                ret = self.tokens_to_cpl(ctx, expr_tokens)
-                if isinstance(ret, CplScore):
-                    # Cleaning the return results of the inline expression since they aren't going to be used
-                    cl1 = f"scoreboard players operation {ret.location} = "
-                    cl2 = f"execute store result score {ret.location} run "
-                    cl3 = f"execute store result score {ret.location} run data get"
-                    cl4 = f"execute store result score {ret.location} run scoreboard players get"
-                    if len(ctx.file) > 0 and (
-                            ctx.file[-1].startswith(cl1)
-                            or ctx.file[-1].startswith(cl3)
-                            or ctx.file[-1].startswith(cl4)
-                    ):
-                        ctx.file.pop()
-                        continue
-                    if len(ctx.file) > 0 and ctx.file[-1].startswith(cl2):
-                        ctx.file[-1] = ctx.file[-1][len(cl2):]
-                if isinstance(ret, CplNBT) and ret.location.startswith("storage temp "):
-                    # Cleaning the return results of the inline expression since they aren't going to be used
-                    cl1 = f"data modify {ret.location} set from"
-                    if len(ctx.file) > 0 and ctx.file[-1].startswith(cl1):
-                        ctx.file.pop()
-                        continue
-                    if len(ctx.file) > 1 and ctx.file[-2].startswith(cl1) and ret.location not in ctx.file[-1]:
-                        ctx.file.pop(-2)
-                        continue
-                continue
-            if isinstance(statement, DefineFunctionStatement):
-                if ctx.function or ctx.loop:
-                    raise_syntax_error(
-                        "Functions should be declared in the main scope", statement
-                    )
-                fn_name = statement.name.value
-                if ctx.class_name is not None and fn_name != ctx.class_name:
-                    fn_name = f"{ctx.class_name}.{fn_name}"
-                arguments: List[FunctionArgument] = self._chains_to_args(statement.arguments)
-                ret = (
-                    cpl_def_from_tokens(self.classes, statement.returns)
-                    if not isinstance(statement.returns, str)
-                    else statement.returns
+            if has_if:
+                if_name = self._run_safe("__if__", statement.body, ctx)
+                ctx.file.append(f"{if_cmd}function {self.pack_namespace}:{if_name}")
+            if has_else:
+                else_name = self._run_safe("__else__", statement.elseBody, ctx)
+                ctx.file.append(f"{unless_cmd}function {self.pack_namespace}:{else_name}")
+            _return_safe(ctx)
+            return True
+        if isinstance(statement, InlineStatement):
+            expr_tokens = statement.exprTokens
+            ret = self.tokens_to_cpl(ctx, expr_tokens)
+            if isinstance(ret, CplScore):
+                # Cleaning the return results of the inline expression since they aren't going to be used
+                cl1 = f"scoreboard players operation {ret.location} = "
+                cl2 = f"execute store result score {ret.location} run "
+                cl3 = f"execute store result score {ret.location} run data get"
+                cl4 = f"execute store result score {ret.location} run scoreboard players get"
+                if len(ctx.file) > 0 and (
+                        ctx.file[-1].startswith(cl1)
+                        or ctx.file[-1].startswith(cl3)
+                        or ctx.file[-1].startswith(cl4)
+                ):
+                    ctx.file.pop()
+                    return True
+                if len(ctx.file) > 0 and ctx.file[-1].startswith(cl2):
+                    ctx.file[-1] = ctx.file[-1][len(cl2):]
+            if isinstance(ret, CplNBT) and ret.location.startswith("storage temp "):
+                # Cleaning the return results of the inline expression since they aren't going to be used
+                cl1 = f"data modify {ret.location} set from"
+                if len(ctx.file) > 0 and ctx.file[-1].startswith(cl1):
+                    ctx.file.pop()
+                    return True
+                if len(ctx.file) > 1 and ctx.file[-2].startswith(cl1) and ret.location not in ctx.file[-1]:
+                    ctx.file.pop(-2)
+                    return True
+            return True
+        if isinstance(statement, DefineFunctionStatement):
+            if ctx.function or ctx.loop:
+                raise_syntax_error(
+                    "Functions should be declared in the main scope", statement
                 )
-                if ret is None:
-                    raise_syntax_error("Invalid return type for a function", statement)
-                    raise SyntaxError("")
-                ret_loc = ret
-                if isinstance(ret_loc, CplDef):
-                    assert isinstance(statement.returns, list)
-                    assert isinstance(ret, CplDef)
-                    eid = get_expr_id()
-                    ret_loc = _type_to_cpl(
-                        statement.returns[0],
-                        ret,
-                        score_loc=f"fn_return_{eid} __temp__",
-                        nbt_loc=f"storage fn_return _{eid}",
-                    )
-                is_class_init = fn_name == ctx.class_name
-                if is_class_init:
-                    if isinstance(statement.returns, list) and len(statement.returns) > 0:
-                        raise_syntax_error("Class initializers cannot have return types", statement.returns[0])
-                    cls = self.classes[fn_name]
-                    ret_loc = CplObjectNBT(statement.name, f"storage fn_return _{get_expr_id()}",
-                                           cls.attributes.unique_type)
-                types = args_to_str(arguments)
-                count = 0
-                new_functions = []
-                for f in self.functions:
-                    if fn_name == f.name:
-                        count += 1
-                        if types == f.argumentsStr:
-                            if f.function == "replace me":
-                                count -= 1
-                                continue
-                            raise_syntax_error(
-                                "Function with the same name and arguments already exists",
-                                statement.name
-                            )
-                    new_functions.append(f)
-                self.functions.clear()
-                self.functions.extend(new_functions)
-                file_name = statement.name.value.lower()
-                if ctx.class_name is not None:
-                    cls = self.classes[ctx.class_name]
-                    file_name = "__class__/" + cls.name.lower() + "_" + file_name
-                base_file_name = file_name
-                file_name_counter = 0
-                while file_name in self.files:
-                    file_name_counter += 1
-                    file_name = base_file_name + str(file_name_counter)
-                f = FunctionDeclaration(
-                    type="radon",
-                    name=fn_name,
-                    returns=ret_loc,
-                    arguments=arguments,
+            fn_name = statement.name.value
+            if ctx.class_name is not None and fn_name != ctx.class_name:
+                fn_name = f"{ctx.class_name}.{fn_name}"
+            arguments: List[FunctionArgument] = self._chains_to_args(statement.arguments)
+            ret = (
+                cpl_def_from_tokens(self.classes, statement.returns)
+                if not isinstance(statement.returns, str)
+                else statement.returns
+            )
+            if ret is None:
+                raise_syntax_error("Invalid return type for a function", statement)
+                raise SyntaxError("")
+            ret_loc = ret
+            if isinstance(ret_loc, CplDef):
+                assert isinstance(statement.returns, list)
+                assert isinstance(ret, CplDef)
+                eid = get_expr_id()
+                ret_loc = _type_to_cpl(
+                    statement.returns[0],
+                    ret,
+                    score_loc=f"fn_return_{eid} __temp__",
+                    nbt_loc=f"storage fn_return _{eid}",
+                )
+            is_class_init = fn_name == ctx.class_name
+            if is_class_init:
+                if isinstance(statement.returns, list) and len(statement.returns) > 0:
+                    raise_syntax_error("Class initializers cannot have return types", statement.returns[0])
+                cls = self.classes[fn_name]
+                ret_loc = CplObjectNBT(statement.name, f"storage fn_return _{get_expr_id()}",
+                                       cls.attributes.unique_type)
+            count = 0
+            new_functions = []
+            for f in self.functions:
+                if fn_name == f.name:
+                    count += 1
+                    if self.check_args(f.arguments, arguments, statement.name):
+                        if f.function == "replace me":
+                            count -= 1
+                            return True
+                        raise_syntax_error(
+                            "Function with the same name and arguments already exists",
+                            statement.name
+                        )
+                new_functions.append(f)
+            self.functions.clear()
+            self.functions.extend(new_functions)
+            file_name = statement.name.value.lower()
+            if ctx.class_name is not None:
+                cls = self.classes[ctx.class_name]
+                file_name = "__class__/" + cls.name.lower() + "_" + file_name
+            base_file_name = file_name
+            file_name_counter = 0
+            while file_name in self.files:
+                file_name_counter += 1
+                file_name = base_file_name + str(file_name_counter)
+            f = FunctionDeclaration(
+                type="radon",
+                name=fn_name,
+                returns=ret_loc,
+                arguments=arguments,
+                file_name=file_name,
+                class_name=ctx.class_name
+            )
+
+            self.functions.append(f)
+            fn_file = []
+            self.files[file_name] = fn_file
+            for index, arg in enumerate(arguments):
+                if arg.store_via == "macro":
+                    t = arg.store.unique_type.content  # type: CplDef
+                    macro = f"$({arg.store.location.split(' ')[-1]})"
+                    if t.type == "string":
+                        macro = f'"{macro}"'
+                    fn_file.append(f"$data modify {arg.store.location} append value {macro}")
+            self._transpile(
+                TranspilerContext(
+                    transpiler=self,
                     file_name=file_name,
-                    class_name=ctx.class_name
+                    file=fn_file,
+                    function=f,
+                    loop=ctx.loop,
+                    class_name=ctx.class_name),
+                statement.body
+            )
+            if f.returns == "auto":
+                f.returns = "void"
+            if f.returns != "void":
+                fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
+            return True
+        if isinstance(statement, ReturnStatement):
+            if not ctx.function:
+                raise_syntax_error(
+                    "Cannot use return keyword outside functions", statement
                 )
+                return True
+            expr_tokens = statement.exprTokens
+            if ctx.function.returns == "void" and len(expr_tokens) != 0:
+                raise_syntax_error(
+                    f"Function cannot return a value because it has a void return type",
+                    statement,
+                )
+            if ctx.function.returns != "void":
+                cpl = self.tokens_to_cpl(ctx, expr_tokens)
+                if ctx.function.returns == "auto":
+                    if not isinstance(cpl, CplScore) and not isinstance(cpl, CplNBT):
+                        cpl = cpl.cache(ctx)
+                    ctx.function.returns = cpl
+                elif not isinstance(ctx.function.returns, str):
+                    if cpl.unique_type != ctx.function.returns.unique_type:
+                        raise_syntax_error(
+                            f"Function has a return type of {ctx.function.returns.unique_type}, "
+                            f"but a {cpl.unique_type} was returned",
+                            statement
+                        )
+                    ctx.function.returns._set(ctx, cpl)
 
-                self.functions.append(f)
-                fn_file = []
-                self.files[file_name] = fn_file
-                for index, arg in enumerate(arguments):
-                    if arg.store_via == "macro":
-                        t = arg.store.unique_type.content  # type: CplDef
-                        macro = f"$({arg.store.location.split(' ')[-1]})"
-                        if t.type == "string":
-                            macro = f'"{macro}"'
-                        fn_file.append(f"$data modify {arg.store.location} append value {macro}")
-                self._transpile(
-                    TranspilerContext(
-                        transpiler=self,
-                        file_name=file_name,
-                        file=fn_file,
-                        function=f,
-                        loop=ctx.loop,
-                        class_name=ctx.class_name),
-                    statement.body
-                )
-                if f.returns == "auto":
-                    f.returns = "void"
-                if f.returns != "void":
-                    fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
-                continue
-            if isinstance(statement, ReturnStatement):
-                if not ctx.function:
-                    raise_syntax_error(
-                        "Cannot use return keyword outside functions", statement
-                    )
-                    continue
-                expr_tokens = statement.exprTokens
-                if ctx.function.returns == "void" and len(expr_tokens) != 0:
-                    raise_syntax_error(
-                        f"Function cannot return a value because it has a void return type",
-                        statement,
-                    )
-                if ctx.function.returns != "void":
-                    cpl = self.tokens_to_cpl(ctx, expr_tokens)
-                    if ctx.function.returns == "auto":
-                        if not isinstance(cpl, CplScore) and not isinstance(cpl, CplNBT):
-                            cpl = cpl.cache(ctx)
-                        ctx.function.returns = cpl
-                    elif not isinstance(ctx.function.returns, str):
-                        if cpl.unique_type != ctx.function.returns.unique_type:
-                            raise_syntax_error(
-                                f"Function has a return type of {ctx.function.returns.unique_type}, "
-                                f"but a {cpl.unique_type} was returned",
-                                statement
-                            )
-                        ctx.function.returns._set(ctx, cpl)
+            if ctx.file is not self.files[ctx.function.file_name]:
+                ctx.file.append(f"scoreboard players set __returned__ __temp__ 1")
+            ctx.file.append(f"return 0")
+            if ctx.file is self.files[ctx.function.file_name]:
+                return
+        if isinstance(statement, IntroduceVariableStatement):
+            name = statement.name.value
+            if name in self.variables:
+                raise_syntax_error("Variable is already introduced", statement)
+            type_v = cpl_def_from_tokens(self.classes, statement.varType)
+            if not type_v:
+                raise_syntax_error(f"Invalid type", statement)
+                raise SyntaxError("")
+            self.variables[name] = VariableDeclaration(name, type_v, False)
+            self.load_file.append(
+                f'scoreboard objectives add {name} dummy "{name}"'
+            )
+            self.load_file.append(
+                f"scoreboard players enable {name} global"
+            )
+            return True
+        if isinstance(statement, ExecuteMacroStatement):
+            exec_name = self._run_safe("__execute__", statement.body, ctx)
+            ctx.file.append(
+                f"execute {statement.command} run function {self.pack_namespace}:{exec_name}"
+            )
+            _return_safe(ctx)
+            return True
+        raise_syntax_error("Invalid statement", statement)
 
-                if ctx.file is not self.files[ctx.function.file_name]:
-                    ctx.file.append(f"scoreboard players set __returned__ __temp__ 1")
-                ctx.file.append(f"return 0")
-                if ctx.file is self.files[ctx.function.file_name]:
-                    return
-            if isinstance(statement, IntroduceVariableStatement):
-                name = statement.name.value
-                if name in self.variables:
-                    raise_syntax_error("Variable is already introduced", statement)
-                type_v = cpl_def_from_tokens(self.classes, statement.varType)
-                if not type_v:
-                    raise_syntax_error(f"Invalid type", statement)
-                    raise SyntaxError("")
-                self.variables[name] = VariableDeclaration(type_v, False)
-                self.load_file.append(
-                    f'scoreboard objectives add {name} dummy "{name}"'
-                )
-                self.load_file.append(
-                    f"scoreboard players enable {name} global"
-                )
-                continue
-            if isinstance(statement, ExecuteMacroStatement):
-                exec_name = self._run_safe("__execute__", statement.body, ctx)
-                ctx.file.append(
-                    f"execute {statement.command} run function {self.pack_namespace}:{exec_name}"
-                )
-                _return_safe(ctx)
-                continue
-            raise_syntax_error("Invalid statement", statement)
+    def _transpile(self, ctx: TranspilerContext, statements: List[Statement]):
+        for statement in statements:
+            self._transpile_statement(ctx, statement)
 
     def _run_safe(self, folder_name, statements, ctx: TranspilerContext):
         eid = get_expr_id()
@@ -689,7 +767,8 @@ class Transpiler:
         new_file = []
         loop = ctx.loop
         if isinstance(loop, LoopStatement):
-            continue_ = f"function {self.pack_namespace}:{file_name}"
+            mac = get_fn_macro_obj(ctx)
+            continue_ = f"{'$' if mac else ''}function {self.pack_namespace}:{file_name}" + mac
             if loop.time:
                 continue_ = f"schedule function {self.pack_namespace}:{file_name} {loop.time.value} replace"
             loop = LoopDeclaration(
@@ -727,7 +806,6 @@ class Transpiler:
             arg_name = arg[1][0].value
             if arg_name in arg_names:
                 raise_syntax_error("Argument name is already used", arg[1][0])
-            eid = get_expr_id()
             arguments.append(
                 FunctionArgument(
                     arg_name,
@@ -855,7 +933,7 @@ class Transpiler:
 
     def _var_to_cpl_or_none(
             self, ctx: TranspilerContext, t: Token
-    ) -> Union[CplScore, CplNBT, None]:
+    ) -> Union[CompileTimeValue, None]:
         if isinstance(t, SelectorIdentifierToken):
             name = t.name.value
             if name not in self.variables:
@@ -885,7 +963,9 @@ class Transpiler:
             return val
         if t.type == TokenType.IDENTIFIER:
             name = t.value
-            if name not in self.variables:
+            if name not in self.variables and name not in builtin_vars:
+                if self.fn_exists(name):
+                    return CplString(t, name, is_fn_reference=True)
                 if ctx.function and ctx.class_name is not None and name == "this":
                     return CplObjectNBT(t, f"storage class this[-1]",
                                         self.classes[ctx.class_name].sample.unique_type)
@@ -902,8 +982,11 @@ class Transpiler:
                                            found.store.unique_type.content)
                         return found.store
                 return None
-
-            var = self.variables[name]
+            var = self.variables[name] if name in self.variables else builtin_vars[name]
+            if var.init_func is not None:
+                var.init_func(ctx)
+            if var.get_func is not None:
+                return var.get_func(ctx)
             var_type = var.type
             if var.constant:
                 return var.value
@@ -917,21 +1000,21 @@ class Transpiler:
 
     def variable_token_to_cpl(
             self, ctx: TranspilerContext, t: Token
-    ) -> Union[CplScore, CplNBT]:
+    ) -> CompileTimeValue:
         res = self._var_to_cpl_or_none(ctx, t)
         if res is None:
             raise_syntax_error("Variable not found", t)
             raise SyntaxError("")
         return res
 
-    def chain_to_cpl(self, ctx: TranspilerContext, t: List[Token]):
+    def chain_to_cpl(self, ctx: TranspilerContext, t: List[Token]) -> CompileTimeValue:
         cpl = self.token_to_cpl(ctx, t[0])
         for token in t[1:]:
             if token.type == TokenType.IDENTIFIER:
-                cpl = cpl.get_index(ctx, CplString(token, token.value))
+                cpl = cpl.get_index(ctx, CplString(token, token.value), token)
                 continue
             if token.type == TokenType.INT_LITERAL:
-                cpl = cpl.get_index(ctx, CplInt(token, token.value))
+                cpl = cpl.get_index(ctx, CplInt(token, token.value), token)
                 continue
             if isinstance(token, GroupToken):
                 if token.open.value == "[":
@@ -941,7 +1024,7 @@ class Transpiler:
                     spl = list(map(lambda x: self.tokens_to_cpl(ctx, x) if len(x) > 0 else None,
                                    split_tokens(token.children, ":", comma_errors=False)))
                     if len(spl) == 1:
-                        cpl = cpl.get_index(ctx, spl[0])
+                        cpl = cpl.get_index(ctx, spl[0], token)
                         continue
                     if len(spl) > 3:
                         raise_syntax_error("A slice can only include two colons.", token)
@@ -955,14 +1038,19 @@ class Transpiler:
                     if spl[2] is None:
                         spl[2] = CplInt(token, 1)
 
-                    cpl = cpl.get_slice(ctx, spl[0], spl[1], spl[2])
+                    cpl = cpl.get_slice(ctx, spl[0], spl[1], spl[2], token)
                     continue
                 if token.func:
-                    args = list(map(lambda x: self.tokens_to_cpl(ctx, x), split_tokens(token.children, ",")))
-                    cpl = cpl.call_index(ctx, token.func.value, args)
+                    cpl = cpl.call_index(ctx, token.func.value, self.arg_tokens_to_cpl(ctx, token.children), token)
+                    continue
+                if token.open.value == "(":
+                    cpl = cpl.call(ctx, self.arg_tokens_to_cpl(ctx, token.children), token)
                     continue
             raise_syntax_error(f"Cannot index with the token", token)
         return cpl
+
+    def arg_tokens_to_cpl(self, ctx: TranspilerContext, tokens: List[Token]):
+        return list(map(lambda x: self.chains_to_cpl(ctx, chain_tokens(x)), split_tokens(tokens, ",")))
 
     def token_to_cpl(self, ctx: TranspilerContext, t: Token):
         if t.type == TokenType.INT_LITERAL:
@@ -1014,15 +1102,25 @@ class Transpiler:
                 if colon_token.value != ":":
                     raise_syntax_error("Expected a colon", colon_token)
                 expr = tl[2:]
-                if key_token.type not in {TokenType.STRING_LITERAL, TokenType.IDENTIFIER}:
+                if key_token.type != TokenType.STRING_LITERAL:
                     raise_syntax_error("Expected an object key", key_token)
-                    return NULL_VALUE
-                k = key_token.value
-                if key_token.type == TokenType.STRING_LITERAL:
-                    k = k[1:-1]
+                    return CplInt(t, 0)
+                k = key_token.value[1:-1]
                 d[k] = self.tokens_to_cpl(ctx, expr)
 
             return CplObject(t, d, class_name=None)
+        if isinstance(t, LambdaFunctionToken):
+            name = f"__lambda__/{get_expr_id()}"
+            self._transpile_statement(ctx, DefineFunctionStatement(
+                t.code,
+                t.start,
+                t.end,
+                Token(name, TokenType.IDENTIFIER, 0, len(name)),
+                parse(t.body.children, self.macros, list(self.classes.keys())),
+                list(map(lambda x: chain_tokens(x), split_tokens(t.arguments.children, ","))),
+                "auto"
+            ))
+            return CplString(t, name, is_fn_reference=True)
         raise_syntax_error("Invalid expression", t)
         raise ValueError("")
 
@@ -1030,7 +1128,7 @@ class Transpiler:
             self, ctx: TranspilerContext, chains: List[List[Token]]
     ) -> CompileTimeValue:
         if len(chains) == 0:
-            return NULL_VALUE
+            return CplInt(None, 0)
         if len(chains) == 1:
             return self.chain_to_cpl(ctx, chains[0])
         t0 = chains[0]
@@ -1042,9 +1140,9 @@ class Transpiler:
                 ctx,
             )
         if t1[0].value in INC_OP:
-            variable_cpl = self.chain_to_cpl(ctx, t0)  # type: CplScore | CplNBT
+            variable_cpl = self.chain_to_cpl(ctx, t0)
 
-            variable_cpl.compute(ctx, t1[0].value[0] + "=", CplInt(None, 1))
+            variable_cpl.compute(ctx, t1[0].value[0] + "=", CplInt(None, 1), t0[0])
 
             return variable_cpl
         constant_keyword = False
@@ -1107,7 +1205,7 @@ class Transpiler:
                         raise_syntax_error(f"Variable was defined as a {front_type} but got a {cpl.unique_type}", t0[0])
                 if isinstance(cpl, CplSelector):
                     last_var_type = INT_TYPE
-                self.variables[var_name] = VariableDeclaration(last_var_type, is_constant)
+                self.variables[var_name] = VariableDeclaration(var_name, last_var_type, is_constant)
                 if is_constant:
                     if (isinstance(var_name_token, SelectorIdentifierToken)
                             or isinstance(var_name_token, BlockIdentifierToken)):
@@ -1124,7 +1222,7 @@ class Transpiler:
                 if is_constant:
                     raise_syntax_error("Already defined variables cannot be assigned with the 'const' keyword", t0[0])
 
-            variable_cpl = self.chain_to_cpl(ctx, t0)  # type: CplScore | CplNBT
+            variable_cpl = self.chain_to_cpl(ctx, t0)
 
             if variable_cpl.unique_type.type in {"int", "float"} and isinstance(cpl, CplSelector):
                 variable_cpl._set(ctx, CplInt(t0[0], 0))
@@ -1140,7 +1238,7 @@ class Transpiler:
             if variable_cpl.unique_type == "int" and cpl.unique_type == "float":
                 show_warning("Losing float precision by assigning a float to an int.", t1[0])
 
-            variable_cpl.compute(ctx, t1[0].value, cpl)
+            variable_cpl.compute(ctx, t1[0].value, cpl, t0[0])
 
             return cpl
 
@@ -1156,7 +1254,7 @@ class Transpiler:
             right = stack.pop()
             left = stack.pop()
 
-            score = left.compute(ctx, chain[0].value, right)
+            score = left.compute(ctx, chain[0].value, right, t0[0])
 
             stack.append(score)
 
@@ -1166,7 +1264,7 @@ class Transpiler:
             self, ctx: TranspilerContext, tokens: List[Token]
     ) -> CompileTimeValue:
         if len(tokens) == 0:
-            return NULL_VALUE
+            return CplInt(None, 0)
         chains = chain_tokens(tokens)
         return self.chains_to_cpl(ctx, chains)
 
@@ -1178,42 +1276,36 @@ class Transpiler:
             base: Union[Token, None] = None,
             class_name: str | None = None,
             store_class: CplObjectNBT | None = None
-    ) -> Union[CplScore, CplNBT]:
-        found_fn_name: FunctionDeclaration | None = None
-        for f in self.functions:
-            if f.name == name:
-                found_fn_name = f
-                break
+    ) -> CompileTimeValue:
+        exists_fn = self.fn_exists(name)
 
-        if not found_fn_name and name not in builtin:
+        if not exists_fn and name not in builtin_fns:
             raise_syntax_error("Undefined function", base)
-            return NULL_VALUE
+            return CplInt(base, 0)
 
-        if name not in self.classes and not found_fn_name and name in builtin:
-            built = builtin[name]
+        if name not in self.classes and not exists_fn and name in builtin_fns:
+            built = builtin_fns[name]
             if len(built) == 1 and built[0].type == "python-raw":
                 if not base:
                     raise_syntax_error("Cannot run a raw function without tokens", base)
                 return built[0].function(ctx, base)
             if len(built) == 1 and built[0].type == "python-cpl":
                 return built[0].function(ctx, args, base)
-            self.functions += built
+            self.functions.extend(built)
 
         if name in self.classes:
             cls = self.classes[name]
             class_name = cls.name
             ctx.file.append(f"data modify storage class this append {cls.sample.get_data_str(ctx)}")
 
-        given_types = ", ".join([str(arg.unique_type) for arg in args])
-
         found_fn = None
         available = []
         for f in self.functions:
             if f.name == name:
                 available.append(f"{f.name}({', '.join(str(arg.unique_type) + ' ' + arg.name for arg in f.arguments)})")
-            if f.name == name and f.argumentsStr == given_types:
-                found_fn = f
-                break
+                if self.check_args(f.arguments, args, base):
+                    found_fn = f
+                    break
         if found_fn is None:
             raise_syntax_error(f"Invalid arguments. Available usages:\n{'\n'.join(available)}", base)
             raise SyntaxError("")
@@ -1248,7 +1340,7 @@ class Transpiler:
         if found_fn.type == "python":
             found_fn.function(ctx, found_fn, base)
 
-        actually_returning = NULL_VALUE
+        actually_returning = CplInt(base, 0)
 
         if found_fn.type == "radon":
             ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
@@ -1297,9 +1389,14 @@ class Transpiler:
 
     def run_function(
             self, ctx: TranspilerContext, t: GroupToken
-    ) -> Union[CplScore, CplNBT]:
+    ) -> CompileTimeValue:
         if not t.func:
-            return NULL_VALUE
+            return CplInt(t, 0)
+
+        if t.func.value in builtin_fns:
+            built = builtin_fns[t.func.value]
+            if len(built) == 1 and built[0].type == "python-raw":
+                return built[0].function(ctx, t)
 
         separated = split_tokens(t.children, ",")
         arguments: List[CompileTimeValue] = []
@@ -1309,7 +1406,7 @@ class Transpiler:
         return self.run_function_with_cpl(ctx, t.func.value, arguments, base=t)
 
     def compute_tokens(self, ctx: TranspilerContext, left: List[Token], op: str, right: List[Token]):
-        return self.tokens_to_cpl(ctx, left).compute(ctx, op, self.tokens_to_cpl(ctx, right))
+        return self.tokens_to_cpl(ctx, left).compute(ctx, op, self.tokens_to_cpl(ctx, right), left[0])
 
     def _cmp_to_cpl(self, ctx, ls):
         return self.compute_tokens(ctx, ls[0], ls[1].value, ls[2])
@@ -1323,15 +1420,15 @@ def _return_safe(ctx: TranspilerContext):
     if ctx.loop:
         if ctx.file is ctx.loop.file:
             ctx.file.append(
-                f"execute if score {ctx.loop.eid} __break__ matches 1..1 run return 0"
+                f"execute if score __break__{ctx.loop.eid} __temp__ matches 1..1 run return 0"
             )
             ctx.file.append(
-                f"execute if score {ctx.loop.eid} __continue__ matches 1..1 run return run {ctx.loop.continue_}"
+                f"execute if score __continue__{ctx.loop.eid} __temp__ matches 1..1 run return run {ctx.loop.continue_}"
             )
         else:
             ctx.file.append(
-                f"execute if score {ctx.loop.eid} __break__ matches 1..1 run return 0"
+                f"execute if score __break__{ctx.loop.eid} __temp__ matches 1..1 run return 0"
             )
             ctx.file.append(
-                f"execute if score {ctx.loop.eid} __continue__ matches 1..1 run return 0"
+                f"execute if score __continue__{ctx.loop.eid} __temp__ matches 1..1 run return 0"
             )

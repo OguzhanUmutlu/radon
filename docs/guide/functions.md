@@ -1,13 +1,13 @@
 # Functions
 
-Functions in Radon can be defined in various ways. Check the [built-in functions](./built-in-functions) page to see the
-list and usage of built-in functions.
+Functions in Radon can be defined in various ways. Check the [built-in features](./built-in-features) page to see the
+list and usage of built-in features.
 
 A simple function that prints `Hello, world!` to the chat:
 
 ```js
 fn myFunction {
-  print("Hello, world!")
+  print(@a, "Hello, world!")
 }
 
 myFunction()
@@ -49,7 +49,7 @@ behind the type of the argument you want to mark as a macro. Here's a simple exa
 
 ```js
 fn my_function($int a) {
-  print("The integer you gave is: ", a)
+  print(@a, "The integer you gave is: ", a)
 }
 
 my_function(10)
@@ -63,7 +63,7 @@ If you want to use function arguments without macros, you can use NBT. Here's an
 
 ```js
 fn my_function(int a) {
-  print("The integer you gave is: ", a)
+  print(@a, "The integer you gave is: ", a)
 }
 
 // From the game run this to set the first argument:

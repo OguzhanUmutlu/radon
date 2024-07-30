@@ -1,20 +1,19 @@
 from typing import List
 
-from ..cpl.base import CompileTimeValue
+from ..cpl._base import CompileTimeValue
+from ..cpl.int import CplInt
 from ..error import raise_syntax_error
 from ..tokenizer import Token
-from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib, NULL_VALUE
-
-_ = 0
+from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 
 
 def lib_swap(ctx: TranspilerContext, args: List[CompileTimeValue], token: Token | None):
     if len(args) != 2:
         raise_syntax_error("Expected 2 arguments for <array>.swap()", token)
     arg0_cached = args[0].cache(ctx)
-    args[0]._set(ctx, args[1])
-    args[1]._set(ctx, arg0_cached)
-    return NULL_VALUE
+    args[0].compute(ctx, "=", args[1], token)
+    args[1].compute(ctx, "=", arg0_cached, token)
+    return CplInt(token, 0)
 
 
 add_lib(FunctionDeclaration(

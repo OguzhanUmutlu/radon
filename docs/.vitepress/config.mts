@@ -93,8 +93,8 @@ export default defineConfig({
                             link: "/guide/classes"
                         },
                         {
-                            text: "Built-in Functions",
-                            link: "/guide/built-in-functions"
+                            text: "Built-in Features",
+                            link: "/guide/built-in-features"
                         }
                     ]
                 }
