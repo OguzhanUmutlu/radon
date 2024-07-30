@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] Spread syntax in arguments: `fn my_func(int a, ...float[] c)`
 - [ ] Cast ints to floats and floats to ints when calling functions. (Maybe make it a config option?)
 - [ ] CplFunction compile time value and storing the function declaration inside it. And also adding .call(
   List[CompileTimeValue]) function with it. Simplifying the definition of a class.

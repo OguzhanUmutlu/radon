@@ -1,7 +1,9 @@
 import json
 import os
 import sys
+import traceback
 from importlib import util
+from types import FunctionType
 from typing import Any, Dict, List, Union, Literal
 
 from .dp_ast import (
@@ -24,7 +26,7 @@ from .dp_ast import (
     make_expr,
     parse_str, parse
 )
-from .error import raise_syntax_error, raise_syntax_error_t, show_warning
+from .error import raise_syntax_error, raise_syntax_error_t, show_warning, raise_error
 from .tokenizer import (
     BlockIdentifierToken,
     GroupToken,
@@ -117,7 +119,8 @@ class LoopDeclaration:
 class FunctionDeclaration:
     def __init__(
             self,
-            type: Literal["radon", "mcfunction", "python", "python-cpl", "python-raw"],
+            type: Literal[
+                "radon", "python", "python-cpl", "python-raw", "python-cpl-imported", "mcfunction-imported"],
             name: str,
             returns="void",  # type: CplScore | CplNBT | str
             arguments: List[FunctionArgument] = None,
@@ -182,12 +185,48 @@ from .cpl.nbt import CplNBT, val_nbt
 from .cpl.nbtobject import CplObjectNBT
 
 
+class CustomCplObject(CplObject):
+    def __init__(self, obj: Dict[str, CompileTimeValue | Any]):
+        super().__init__(None)
+        self.obj = obj
+
+    def _call_index(self, ctx, index, arguments, token):
+        if index in self.obj:
+            fn = self.obj[index]
+            if isinstance(fn, FunctionType):
+                if fn.__code__.co_argcount == 2:
+                    return fn(ctx, arguments)
+                return fn(ctx, arguments, token)
+        return None
+
+    def _get_index(self, ctx, index: CompileTimeValue):
+        if (isinstance(index, CplString)
+                and index.value in self.obj
+                and isinstance(self.obj[index.value], CompileTimeValue)):
+            return self.obj[index.value]
+        return None
+
+
 def _type_to_cpl(
         token: Token, type: CplDef, score_loc: str, nbt_loc: str, force_nbt: bool = False
 ) -> Union[CplScore, CplNBT]:
     if force_nbt or type.type in {"string", "array", "object"}:
         return val_nbt(token, nbt_loc, type)
     return CplScore(token, score_loc, type.type)
+
+
+def py_to_cpl(v):
+    if isinstance(v, CompileTimeValue):
+        return v
+    if isinstance(v, str):
+        return CplString(None, v)
+    if isinstance(v, int):
+        return CplInt(None, v)
+    if isinstance(v, float):
+        return CplFloat(None, v)
+    if isinstance(v, bool):
+        return CplInt(None, 1 if v else 0)
+    return CplInt(None, 0)
 
 
 builtin_fns: Dict[str, List[FunctionDeclaration]] = {}
@@ -217,6 +256,16 @@ def import_module_from_path(file_path):
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def get_module_attr(module):
+    d = {}
+    for k in module.__dict__:
+        if k.startswith("__"):
+            continue
+        v = module.__dict__[k]
+        d[k] = v
+    return d
 
 
 # add lib
@@ -397,8 +446,8 @@ class Transpiler:
     def fn_exists(self, name):
         for fn in self.functions:
             if fn.name == name:
-                return True
-        return False
+                return fn
+        return None
 
     def _transpile_statement(self, ctx: TranspilerContext, statement: Statement):
         if isinstance(statement, DefineClassStatement):
@@ -459,25 +508,57 @@ class Transpiler:
                 methods.append(self.functions[-1])
             return
         if isinstance(statement, ImportStatement):
-            raise_syntax_error("Imports are not yet implemented.", statement)
-            if statement.as_ is None:
-                pass
-            else:
-                # TODO: add imports
-                """save = str(get_expr_id())
-                path = statement.path.value[1:-1]
-
-                self.add_mcfunction_file(save, path)
-                self.functions.append(
-                    FunctionDeclaration(
-                        type="mcfunction",
-                        name=statement._as.value,
-                        file_name=save,
-                        returns="int",
-                        arguments=[],
-                    )
-                )"""
-            return True
+            pt = statement.path.value[1:-1]
+            if pt.endswith(".py"):
+                bef = os.getcwd()
+                os.chdir(self.main_dir)
+                if not os.path.exists(pt) or not os.path.isfile(pt):
+                    os.chdir(bef)
+                    raise_syntax_error("File not found", statement)
+                try:
+                    lib_module = import_module_from_path(pt)
+                except Exception as e:
+                    os.chdir(bef)
+                    raise_error("Import error", str(e), statement)
+                    raise e
+                attrs = get_module_attr(lib_module)
+                os.chdir(bef)
+                if statement.as_ is not None:
+                    name = statement.as_.value
+                    if name not in self.variables:
+                        self.variables[name] = VariableDeclaration(name, CustomCplObject(attrs), True)
+                    return True
+                for name in attrs:
+                    v: Any = attrs[name]
+                    if isinstance(v, FunctionType) and v.__code__.co_argcount in {2, 3}:
+                        self.functions.append(FunctionDeclaration(
+                            type="python-cpl-imported",
+                            name=name,
+                            function=v
+                        ))
+                    elif isinstance(v, CompileTimeValue):
+                        if name not in self.variables:
+                            self.variables[name] = VariableDeclaration(name, v, True)
+                return True
+            if pt.endswith(".mcfunction"):
+                if statement.as_ is None:
+                    raise_syntax_error("Expected 'as' in mcfunction import statement", statement)
+                bef = os.getcwd()
+                os.chdir(self.main_dir)
+                if not os.path.exists(pt) or not os.path.isfile(pt):
+                    os.chdir(bef)
+                    raise_syntax_error("File not found", statement)
+                content = open(pt, "r", encoding="utf-8").read()
+                os.chdir(bef)
+                fn_id = get_expr_id()
+                self.files[f"__imported__/{fn_id}"] = content.split("\n")
+                self.functions.append(FunctionDeclaration(
+                    type="mcfunction-imported",
+                    name=statement.as_.value,
+                    file_name=f"__imported__/{fn_id}"
+                ))
+                return True
+            raise_syntax_error("Invalid import", statement)
         if isinstance(statement, ScheduleStatement):
             file_name = self._run_safe("__schedule__", statement.body, ctx)
             ctx.file.append(
@@ -1293,6 +1374,15 @@ class Transpiler:
                 return built[0].function(ctx, args, base)
             self.functions.extend(built)
 
+        if exists_fn and exists_fn.type == "python-cpl-imported":
+            try:
+                if exists_fn.function.__code__.co_argcount == 2:
+                    return exists_fn.function(ctx, args) or CplInt(base, 0)
+                return exists_fn.function(ctx, args, base)
+            except Exception as _:
+                stack_trace = traceback.format_exc()
+                raise SyntaxError(stack_trace)
+
         if name in self.classes:
             cls = self.classes[name]
             class_name = cls.name
@@ -1334,8 +1424,11 @@ class Transpiler:
             else:
                 store_at._set(ctx, val)
 
-        if found_fn.type == "mcfunction":
-            ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name} with storage fn_mem")
+        if found_fn.type == "mcfunction-imported":
+            eid = f"int_{get_expr_id()} __temp__"
+            ctx.file.append(
+                f"execute store result score {eid} run function {self.pack_namespace}:{found_fn.file_name} with storage fn_mem")
+            return CplScore(base, eid)
 
         if found_fn.type == "python":
             found_fn.function(ctx, found_fn, base)

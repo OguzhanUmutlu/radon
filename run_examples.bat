@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
+pushd %~dp0
+
 clear
 
 set "folders="
@@ -15,4 +17,5 @@ for /D %%d in (examples/*) do (
 
 python -m src.radon -d="%folders%"
 
+popd
 endlocal

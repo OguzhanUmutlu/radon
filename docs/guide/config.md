@@ -1,6 +1,6 @@
 # Config
 
-The radon config can let you customize the behavior of the compiler. The config is stored in `radon.json` in the root of
+The Radon config can let you customize the behavior of the compiler. The config is stored in `radon.json` in the root of
 the project directory.
 
 The default config is:
@@ -10,7 +10,7 @@ The default config is:
   "namespace": "my_namespace",
   "description": "",
   "format": 48,
-  "main": "main.rn",
+  "main": "src/main.rn",
   "outFolder": ".",
   "useLock": false
 }

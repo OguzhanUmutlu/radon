@@ -290,7 +290,7 @@ class CompileTimeValue:
         return self._and(other[0], other[1])
 
     def __call__(self, *args, **kwargs):
-        return self.call(*args, **kwargs)
+        return self.call(args[0], list(args[1:]))
 
     def is_lit_eq(self, v):
         return (isinstance(self, CplInt) or isinstance(self, CplFloat)) and self.value == v

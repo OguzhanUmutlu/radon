@@ -1,8 +1,8 @@
 {
   "namespace": "hello_world",
-  "description": "My hello world data pack!",
-  "format": 48,
-  "main": "main.rn",
+  "description": "",
+  "format": "1.21",
+  "main": "src/main.rn",
   "outFolder": ".",
   "useLock": false
 }

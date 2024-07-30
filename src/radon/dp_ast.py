@@ -688,7 +688,7 @@ def parse_iterate(
 
         _as = None
 
-        if t1.type == TokenType.STRING_LITERAL and t1.value[:-1].endswith(".mcfunction"):
+        if t1.type == TokenType.STRING_LITERAL:
             t2 = next_token(tokens, index)
             if t2 is None or t2.value != "as":
                 raise_syntax_error("Expected an 'as' keyword", t1)

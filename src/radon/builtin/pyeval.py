@@ -1,21 +1,6 @@
-from ..cpl.float import CplFloat
-from ..cpl.int import CplInt
-from ..cpl.string import CplString
 from ..error import raise_error
 from ..tokenizer import GroupToken
-from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
-
-
-def py_to_cpl(v):
-    if isinstance(v, str):
-        return CplString(None, v)
-    if isinstance(v, int):
-        return CplInt(None, v)
-    if isinstance(v, float):
-        return CplFloat(None, v)
-    if isinstance(v, bool):
-        return CplInt(None, 1 if v else 0)
-    return CplInt(None, 0)
+from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib, py_to_cpl
 
 
 def lib_eval(_ctx: TranspilerContext, token: GroupToken):

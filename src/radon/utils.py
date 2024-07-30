@@ -7,7 +7,7 @@ FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC  # 2147483.647
 
 _expr_id = 0
 
-VERSION_RADON = "1.2.2"
+VERSION_RADON = "1.2.3"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:
@@ -56,7 +56,11 @@ def inv_cmp(op: str):
 
 
 # Version argument can be: a pack format, a minecraft version like 1.16.5, or a snapshot version like 23w32a
-def get_pack_format(version: str):
+def get_pack_format(version):
+    if not version:
+        return None
+    if isinstance(version, int):
+        return version
     if version.isnumeric() and (4 <= int(version) <= 18 or version == "48"):
         return int(version)
     version = version.split("-")[0]

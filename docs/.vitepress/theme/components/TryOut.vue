@@ -1,5 +1,5 @@
 <template>
-    <h3 id="version">Loading radon...</h3>
+    <h3 id="version">Loading Radon...</h3>
     <br>
     <input id="namespace" placeholder="Namespace..."><br>
     <input id="pack_format" placeholder="Pack format..."><br>

@@ -1,3 +1,4 @@
+import math
 from math import sqrt, ceil
 from typing import List, Any
 
@@ -5,10 +6,9 @@ from ..cpl._base import CompileTimeValue
 from ..cpl.float import CplFloat
 from ..cpl.int import CplInt
 from ..cpl.nbt import CplNBT
-from ..cpl.object import CplObject
 from ..cpl.score import CplScore
 from ..error import raise_syntax_error
-from ..transpiler import TranspilerContext, add_lib
+from ..transpiler import TranspilerContext, add_lib, CustomCplObject
 from ..utils import FLOAT_PREC, VariableDeclaration
 
 
@@ -278,31 +278,19 @@ def lib_random(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__random__.rng.result __temp__", "int")._set_add(ctx, min_)
 
 
-class MathObject(CplObject):
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
-        if index == "sqrt":
-            return lib_sqrt(ctx, arguments, token)
-        if index == "cbrt":
-            return lib_cbrt(ctx, arguments, token)
-        if index == "isqrt":
-            return lib_isqrt(ctx, arguments, token)
-        if index == "floor":
-            return lib_floor(ctx, arguments, token)
-        if index == "ceil":
-            return lib_ceil(ctx, arguments, token)
-        if index == "round":
-            return lib_round(ctx, arguments, token)
-        if index == "min":
-            return lib_min(ctx, arguments, token)
-        if index == "max":
-            return lib_max(ctx, arguments, token)
-        if index == "random":
-            return lib_random(ctx, arguments, token)
-        return None
-
-
 add_lib(VariableDeclaration(
     name="Math",
-    type=MathObject(),
+    type=CustomCplObject({
+        "sqrt": lib_sqrt,
+        "cbrt": lib_cbrt,
+        "isqrt": lib_isqrt,
+        "floor": lib_floor,
+        "ceil": lib_ceil,
+        "round": lib_round,
+        "min": lib_min,
+        "max": lib_max,
+        "random": lib_random,
+        "PI": CplFloat(None, math.pi),
+    }),
     constant=True
 ))

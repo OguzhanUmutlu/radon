@@ -93,8 +93,16 @@ export default defineConfig({
                             link: "/guide/classes"
                         },
                         {
+                            text: "Importing",
+                            link: "/guide/importing"
+                        },
+                        {
                             text: "Built-in Features",
                             link: "/guide/built-in-features"
+                        },
+                        {
+                            text: "Python API",
+                            link: "/guide/python_api"
                         }
                     ]
                 }

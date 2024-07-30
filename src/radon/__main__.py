@@ -45,6 +45,7 @@ class RadonArgumentParser(ArgumentParser):
 parser = RadonArgumentParser()
 args = parser.parse_args()
 cwd_list = args.d.split("|")
+original_cwd = os.getcwd()
 
 
 # real path
@@ -96,7 +97,7 @@ def build_dir():
     config = read_config()
 
     if not path.exists(config["main"]):
-        return "The main file does not exist!"
+        return "The main file does not exist: " + config["main"] + ", cwd: " + os.getcwd()
 
     with open(pathr(config["main"]), "r") as file:
         code = file.read()
@@ -108,7 +109,7 @@ def build_dir():
             macros=macros,
             pack_namespace=config["namespace"],
             pack_description=config["description"],
-            pack_format=config["format"],
+            pack_format=get_pack_format(config["format"]),
             main_dir=config["main"] + "/../")
     except SyntaxError as e:
         return str(e)
@@ -148,6 +149,8 @@ def build_dir():
             os.makedirs(out_folder + "/data", exist_ok=True)
 
     for out_folder in out_folders:
+        if "data" in config and path.exists(config["data"]) and path.isdir(config["data"]):
+            shutil.copytree(config["data"], out_folder + "/data", dirs_exist_ok=True)
         for pt in dp_files:
             file_name = pt
             pt = f"{out_folder}/{pt}"
@@ -163,6 +166,10 @@ def build_dir():
 def build():
     res = []
     for cwd in cwd_list:
+        os.chdir(original_cwd)
+        if not path.exists(cwd):
+            print(f"{RED}Directory {cwd} does not exist!{RESET}")
+            exit(1)
         os.chdir(cwd)
         s = build_dir()
         if isinstance(s, str):
@@ -175,14 +182,9 @@ def init_dir():
         return
     print(f"{BLUE}No config file found, generating radon.json")
 
-    main_file = "main.rn"
-
-    for file in os.listdir("."):
-        if file.endswith(".rn") and path.isfile("./" + file):
-            main_file = file
-            break
-
-    pack_namespace = get_input(f"{CYAN}Namespace(Leave blank to cancel): {RESET}")
+    pack_namespace = None
+    while not pack_namespace:
+        pack_namespace = get_input(f"{CYAN}*Namespace: {RESET}")
 
     if not pack_namespace:
         print(f"{RED}Cancelling...{RESET}")
@@ -190,26 +192,14 @@ def init_dir():
 
     pack_desc = get_input(f"{CYAN}Description: {RESET}")
 
-    while True:
-        pack_format = get_pack_format(
-            get_input(f"{CYAN}Pack format or Minecraft version: {RESET}")
-        )
-        if pack_format is None:
-            print(
-                f"{RED}Invalid pack format or Minecraft version please try again.{RESET}"
-            )
-            continue
-        break
+    pack_format = None
 
-    pack_main = get_input(f"{CYAN}Main file({main_file}): {RESET}")
+    while not get_pack_format(pack_format):
+        pack_format = get_input(f"{CYAN}*Pack format or Minecraft version: {RESET}")
 
-    if not pack_main:
-        pack_main = main_file
-
-    pack_output_folder = get_input(f"{CYAN}Output folder(.): {RESET}")
-
-    if not pack_output_folder:
-        pack_output_folder = "."
+    pack_main = get_input(f"{CYAN}Main file(src/main.rn): {RESET}") or "src/main.rn"
+    pack_data = get_input(f"{CYAN}Data folder(src/data): {RESET}") or "src/data"
+    pack_output_folder = get_input(f"{CYAN}Output folder(.): {RESET}") or "."
 
     with open("./radon.json", "w") as file:
         file.write(
@@ -219,6 +209,7 @@ def init_dir():
                     "description": pack_desc,
                     "format": pack_format,
                     "main": pack_main,
+                    "data": pack_data,
                     "outFolder": pack_output_folder,
                     "useLock": False,
                 },
@@ -226,9 +217,12 @@ def init_dir():
             )
         )
 
-    if not path.exists(main_file):
-        with open(main_file, "w") as file:
+    if not path.exists(pack_main):
+        os.makedirs(path.dirname(pack_main), exist_ok=True)
+        with open(pack_main, "w") as file:
             file.write("print(@a, 'Hello, world!')")
+    if not path.exists(pack_data):
+        os.makedirs(pack_data, exist_ok=True)
 
     print(f"{GREEN}Datapack's workplace is ready!{RESET}")
     build_for_watch()
@@ -237,6 +231,10 @@ def init_dir():
 
 def init():
     for cwd in cwd_list:
+        os.chdir(original_cwd)
+        if not path.exists(cwd):
+            print(f"{RED}Directory {cwd} does not exist!{RESET}")
+            exit(1)
         os.chdir(cwd)
         init_dir()
 
@@ -245,10 +243,7 @@ def watch_snapshot():
     files = []
     files += map(
         lambda x: path.join("./", x),
-        filter(
-            lambda x: x.endswith(".rn") or x == path.join(".", "radon.json"),
-            listdir_recursive("."),
-        ),
+        list(listdir_recursive("./src")) + ["radon.json"]
     )
     return {f: path.getmtime(f) for f in files}
 
@@ -257,7 +252,7 @@ def build_for_watch():
     start = time()
     built = build()
     if isinstance(built, str):
-        print(built)
+        print(RED + built + RESET)
     else:
         took = time() - start
         print(f"{GREEN}Datapack has been built!{GRAY} ({took:.5f}s){RESET}")
@@ -302,7 +297,7 @@ def main():
         start = time()
         built = build()
         if isinstance(built, str):
-            print(built)
+            print(RED + built + RESET)
             sys.exit(1)
 
         took = time() - start

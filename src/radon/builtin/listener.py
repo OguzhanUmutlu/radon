@@ -1,13 +1,10 @@
 import json
 import re
-from typing import List
 
 from ..cpl.int import CplInt
-from ..cpl._base import CompileTimeValue
-from ..cpl.object import CplObject
 from ..cpl.string import CplString
 from ..error import raise_syntax_error
-from ..transpiler import add_lib
+from ..transpiler import add_lib, CustomCplObject
 from ..utils import VariableDeclaration, CplDefFunction, STRING_TYPE, get_str_count, get_expr_id
 
 funcArgs = [CplDefFunction([], None)]  # (() => void)
@@ -68,64 +65,63 @@ def stick_init(tr, file_name, item):
     tr.files[file_name].insert(0, f"scoreboard players set @s on_{item} 0")
 
 
-class ListenerObject(CplObject):
-    def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
-        tr = ctx.transpiler
-        if index == "on":
-            if ctx.function or ctx.loop:
-                raise_syntax_error("Player.on() can only be called in the main scope", token)
-            tr.assert_args("Player.on", [
-                STRING_TYPE, CplDefFunction([], None)
-            ], arguments, token)
-            arg0 = arguments[0]
-            arg1 = arguments[1]
-            if not isinstance(arg0, CplString) or not isinstance(arg1, CplString):
-                raise_syntax_error("Expected a literal string as the first argument for Player.on()", token)
-            event = arg0.value
-            event = event.lower()
-            obj_type = event
+def listener_on(ctx, arguments, token):
+    tr = ctx.transpiler
+    if ctx.function or ctx.loop:
+        raise_syntax_error("Player.on() can only be called in the main scope", token)
+    tr.assert_args("Player.on", [
+        STRING_TYPE, CplDefFunction([], None)
+    ], arguments, token)
+    arg0 = arguments[0]
+    arg1 = arguments[1]
+    if not isinstance(arg0, CplString) or not isinstance(arg1, CplString):
+        raise_syntax_error("Expected a literal string as the first argument for Player.on()", token)
+    event = arg0.value
+    event = event.lower()
+    obj_type = event
 
-            if event == "rejoin":
-                obj_type = "custom:leave_game"
-            # only a-z allowed, use regex
-            file_name = (f"__events__/{event}"
-                         if re.fullmatch(r"[a-z_]+", event)
-                         else f"__events__/{get_str_count(event)}")
+    if event == "rejoin":
+        obj_type = "custom:leave_game"
+    # only a-z allowed, use regex
+    file_name = (f"__events__/{event}"
+                 if re.fullmatch(r"[a-z_]+", event)
+                 else f"__events__/{get_str_count(event)}")
 
-            if file_name not in tr.files:
+    if file_name not in tr.files:
 
-                tr.files[file_name] = []
-                if event == "firstjoin":
-                    first_join_init(tr, file_name)
-                elif event == "join":
-                    join_init(tr, file_name)
-                elif event == "die":
-                    die_init(tr, file_name)
-                elif event == "respawn":
-                    respawn_init(tr, file_name)
-                elif event == "carrot_on_a_stick" or event == "warped_fungus_on_a_stick":
-                    stick_init(tr, file_name, event)
-                else:
-                    tr.files[file_name].insert(0, f"scoreboard players set @s on_{event} 0")
-                    tr.load_file.append(f"scoreboard objectives add on_{event} {obj_type}")
-                    tr.tick_file.insert(0,
-                                        "execute as @a[scores={on_" + event + "=1..}] at @s run function " + tr.pack_namespace + ":" + file_name)
+        tr.files[file_name] = []
+        if event == "firstjoin":
+            first_join_init(tr, file_name)
+        elif event == "join":
+            join_init(tr, file_name)
+        elif event == "die":
+            die_init(tr, file_name)
+        elif event == "respawn":
+            respawn_init(tr, file_name)
+        elif event == "carrot_on_a_stick" or event == "warped_fungus_on_a_stick":
+            stick_init(tr, file_name, event)
+        else:
+            tr.files[file_name].insert(0, f"scoreboard players set @s on_{event} 0")
+            tr.load_file.append(f"scoreboard objectives add on_{event} {obj_type}")
+            tr.tick_file.insert(0,
+                                "execute as @a[scores={on_" + event + "=1..}] at @s run function " + tr.pack_namespace + ":" + file_name)
 
-            arg1_fn = tr.get_fn(arg1.value, [], token)
+    arg1_fn = tr.get_fn(arg1.value, [], token)
 
-            eid = get_expr_id()
+    eid = get_expr_id()
 
-            tr.files[file_name].append(
-                f"execute if score __event__{event}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
+    tr.files[file_name].append(
+        f"execute if score __event__{event}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
 
-            ctx.file.append(f"scoreboard players set @s __event__{event}_{eid} 1")
+    ctx.file.append(f"scoreboard players set @s __event__{event}_{eid} 1")
 
-            return CplInt(self.token, 0)  # returns 0 as an int
-        return None
+    return CplInt(token, 0)  # returns 0 as an int
 
 
 add_lib(VariableDeclaration(
     name="Listener",
-    type=ListenerObject(),
+    type=CustomCplObject({
+        "on": listener_on
+    }),
     constant=True
 ))
