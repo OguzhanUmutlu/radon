@@ -118,7 +118,7 @@ def listener_on(ctx, arguments, token):
     tr.files[file_name].append(
         f"execute if score __event__{event_str}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
 
-    ctx.file.append(f"scoreboard players set @s__event__{event_str}_{eid} __temp__ 1")
+    ctx.file.append(f"scoreboard players set @s __event__{event_str}_{eid} __temp__ 1")
 
     return CplInt(token, 0)  # returns 0 as an int
 
