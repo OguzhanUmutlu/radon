@@ -9,7 +9,7 @@ The default config is:
 {
   "namespace": "my_namespace",
   "description": "",
-  "format": 48,
+  "format": "1.21",
   "main": "src/main.rn",
   "data": "src/data",
   "outFolder": ".",
@@ -29,8 +29,9 @@ Description is a short description of the function. It will only be used in the 
 
 ## Pack format
 
-Pack format is the format of the pack. It will be used in the `pack.mcmeta` file. It will also affect the name of
-the `data/my_namespace/functions` folder, for >=1.21 it will be `data/minecraft/function`.
+Pack format is the format of the pack. It can be either a pack format version as an integer or a Minecraft version. It
+will be used in the `pack.mcmeta` file. It will also affect the name of the `data/my_namespace/functions` folder, for >
+=1.21 it will be `data/minecraft/function`.
 
 ## Main file
 
