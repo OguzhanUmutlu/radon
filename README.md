@@ -156,5 +156,5 @@ class MyClass {
 myInstance = MyClass(50)
 myInstance.increaseTheA()
 
-print(@a, myInstance.a) // it's 51
+print(myInstance.a) // it's 51
 ```

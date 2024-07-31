@@ -7,7 +7,7 @@ Here's an example that creates a simple class and uses it:
 ```js
 class MyClass {
   myFunction {
-    print(@a, "Hello!")
+    print("Hello!")
   }
 }
 
@@ -25,7 +25,7 @@ class MyClass {
 }
 
 myClass = MyClass()
-print(@a, myClass.myAttribute)
+print(myClass.myAttribute)
 ```
 
 ***
@@ -43,7 +43,7 @@ class MyClass {
 
 myClass = MyClass()
 myClass.increaseMyAttribute()
-print(@a, myClass.myAttribute)
+print(myClass.myAttribute)
 ```
 
 ***
@@ -53,7 +53,7 @@ You can also run the methods of your class inside a class method using the `this
 ```js
 class MyClass {
   myOtherFunction() {
-    print(@a, "Hello!")
+    print("Hello!")
   }
   
   myFunction() {
@@ -72,11 +72,11 @@ An example of overloading functions in classes:
 ```js
 class MyClass {
   myFunction() {
-    print(@a, "no arguments!")
+    print("no arguments!")
   }
   
   myFunction(int arg) {
-    print(@a, "argument: ", arg)
+    print("argument: ", arg)
   }
 }
 

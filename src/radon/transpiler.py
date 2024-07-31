@@ -346,7 +346,7 @@ class Transpiler:
 
         # remove the lines after immediate returns
         for file in self.files:
-            if not file.endswith(".mcfunction"):
+            if self.files[file] is load_file:
                 continue
             lines = self.files[file]
             if len(lines) == 0:
@@ -498,14 +498,16 @@ class Transpiler:
 
             for mt in statement.methods:
                 self._transpile_statement(class_ctx, mt)
-                new_methods.append(self.functions[-1])
+                fn = self.functions[-1]
+                new_methods.append(fn.name)
             cls.methods = new_methods
 
             if not has_init:
                 self._transpile(class_ctx, parse(
                     tokenize("fn " + name + "() {}")[0],
                     [], list(self.classes.keys())))
-                methods.append(self.functions[-1])
+                fn = self.functions[-1]
+                methods.append(fn)
             return
         if isinstance(statement, ImportStatement):
             pt = statement.path.value[1:-1]
@@ -704,23 +706,22 @@ class Transpiler:
             if ret is None:
                 raise_syntax_error("Invalid return type for a function", statement)
                 raise SyntaxError("")
+            is_class_init = fn_name == ctx.class_name
             ret_loc = ret
             if isinstance(ret_loc, CplDef):
                 assert isinstance(statement.returns, list)
                 assert isinstance(ret, CplDef)
-                eid = get_expr_id()
                 ret_loc = _type_to_cpl(
                     statement.returns[0],
                     ret,
-                    score_loc=f"fn_return_{eid} __temp__",
-                    nbt_loc=f"storage fn_return _{eid}",
+                    score_loc=f"fn_return __temp__",
+                    nbt_loc=f"storage temp fn_return"
                 )
-            is_class_init = fn_name == ctx.class_name
             if is_class_init:
                 if isinstance(statement.returns, list) and len(statement.returns) > 0:
                     raise_syntax_error("Class initializers cannot have return types", statement.returns[0])
                 cls = self.classes[fn_name]
-                ret_loc = CplObjectNBT(statement.name, f"storage fn_return _{get_expr_id()}",
+                ret_loc = CplObjectNBT(statement.name, f"storage variables this[-1]",
                                        cls.attributes.unique_type)
             count = 0
             new_functions = []
@@ -730,7 +731,7 @@ class Transpiler:
                     if self.check_args(f.arguments, arguments, statement.name):
                         if f.function == "replace me":
                             count -= 1
-                            return True
+                            continue
                         raise_syntax_error(
                             "Function with the same name and arguments already exists",
                             statement.name
@@ -776,6 +777,9 @@ class Transpiler:
                     class_name=ctx.class_name),
                 statement.body
             )
+            if is_class_init:
+                cls = self.classes[ctx.class_name]
+                fn_file.insert(0, f"data modify storage variables this append {cls.sample.get_data_str(ctx)}")
             if f.returns == "auto":
                 f.returns = "void"
             if f.returns != "void":
@@ -1048,7 +1052,7 @@ class Transpiler:
                 if self.fn_exists(name):
                     return CplString(t, name, is_fn_reference=True)
                 if ctx.function and ctx.class_name is not None and name == "this":
-                    return CplObjectNBT(t, f"storage class this[-1]",
+                    return CplObjectNBT(t, f"storage variables this[-1]",
                                         self.classes[ctx.class_name].sample.unique_type)
                 if ctx.function:
                     fn = ctx.function
@@ -1256,6 +1260,8 @@ class Transpiler:
             if len(chains) < 3:
                 raise_syntax_error("Expected an expression for the assignment", t1[0])
             cpl = self.chains_to_cpl(ctx, chains[2:])
+            if t0[0].value == "this" and not ctx.class_name:
+                raise_syntax_error("Cannot access 'this' keyword outside of a class", t0[0])
             variable = self._var_to_cpl_or_none(ctx, t0[0])
 
             var_name_token = t0[0]
@@ -1268,9 +1274,11 @@ class Transpiler:
             if is_init:
                 if t1[0].value != "=" or len(t0) != 1:
                     raise_syntax_error("Variable not found", t0[0])
+                if t0[0] == "this":
+                    raise_syntax_error("Cannot assign 'this' keyword to something", t0[0])
 
                 if cpl.unique_type.type in {"int", "float"}:
-                    self.files["__load__"].append(
+                    self.load_file.append(
                         f'scoreboard objectives add {var_name} dummy "{var_name}"'
                     )
                 if isinstance(cpl, CplTuple) and (not front_type or len(cpl.value) > 0):
@@ -1355,8 +1363,7 @@ class Transpiler:
             name: str,
             args: List[CompileTimeValue],
             base: Union[Token, None] = None,
-            class_name: str | None = None,
-            store_class: CplObjectNBT | None = None
+            class_name: str | None = None
     ) -> CompileTimeValue:
         exists_fn = self.fn_exists(name)
 
@@ -1382,11 +1389,6 @@ class Transpiler:
             except Exception as _:
                 stack_trace = traceback.format_exc()
                 raise SyntaxError(stack_trace)
-
-        if name in self.classes:
-            cls = self.classes[name]
-            class_name = cls.name
-            ctx.file.append(f"data modify storage class this append {cls.sample.get_data_str(ctx)}")
 
         found_fn = None
         available = []
@@ -1468,15 +1470,14 @@ class Transpiler:
             else:
                 actually_returning = returns
 
-        if class_name is not None:
-            cls = self.classes[class_name]
-            if store_class is not None:
-                ctx.file.append(f"data modify {store_class.location} set from storage class this[-1]")
-            if name == class_name:
-                ctx.file.append("data modify storage class return set from storage class this[-1]")
-            ctx.file.append("data remove storage class this[-1]")
-            if name == class_name:
-                actually_returning = CplObjectNBT(base, "storage class return", cls.sample.unique_type)
+        if name in self.classes:
+            class_name = name
+
+        if class_name is not None and ctx.file is not self.main_file:
+            ctx.file.append(f"data modify storage temp class_this set from storage variables this[-1]")
+            ctx.file.append(f"data remove storage variables this[-1]")
+            actually_returning = CplObjectNBT(base, f"storage temp class_this",
+                                              self.classes[class_name].sample.unique_type)
 
         return actually_returning
 

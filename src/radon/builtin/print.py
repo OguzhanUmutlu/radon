@@ -1,14 +1,17 @@
 from typing import List
 
+from src.radon.cpl.selector import CplSelector
+from ..cpl._base import CompileTimeValue
 from ..cpl.int import CplInt
 from ..error import raise_syntax_error
-from ..cpl._base import CompileTimeValue
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 
 
 def _lib_print(ctx: TranspilerContext, args: List[CompileTimeValue], token, prefix: str, name: str):
-    if len(args) < 2:
+    if len(args) < 1:
         raise_syntax_error(f"Invalid arguments. Expected usage: {name}(selector, ...anything)", token)
+    if not isinstance(args[0], CplSelector):
+        args.insert(0, CplSelector(token, "@a"))
     prefix = prefix.replace("@", args[0].value)
     if len(args) == 2:
         ctx.file.append(f"{prefix} {args[1].tellraw_object(ctx)}")

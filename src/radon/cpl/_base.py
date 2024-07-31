@@ -130,7 +130,7 @@ class CompileTimeValue:
         r = self._get_slice(ctx, index1, index2, index3, token)
         self.token = st
         if r is None:
-            ind = ":".join(map(lambda x: x.unique_type, [index1, index2, index3]))
+            ind = ":".join(map(lambda x: str(x.unique_type), [index1, index2, index3]))
             raise_syntax_error(f"Cannot index into {self.unique_type} with [{ind}]", self.token)
         return r
 

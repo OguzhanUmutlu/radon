@@ -220,7 +220,7 @@ def init_dir():
     if not path.exists(pack_main):
         os.makedirs(path.dirname(pack_main), exist_ok=True)
         with open(pack_main, "w") as file:
-            file.write("print(@a, 'Hello, world!')")
+            file.write("print('Hello, world!')")
     if not path.exists(pack_data):
         os.makedirs(pack_data, exist_ok=True)
 

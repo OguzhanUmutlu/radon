@@ -14,7 +14,7 @@ The `loop` loop is an infinite loop.
 
 ```js
 loop {
-  print(@a, "Hello, world!")
+  print("Hello, world!")
 }
 ```
 
@@ -27,7 +27,7 @@ The following example will print the numbers from 1 to 10:
 ```js
 a = 10
 while (a) {
-  print(@a, "A: ", a)
+  print("A: ", a)
   a--
 }
 ```
@@ -42,7 +42,7 @@ The following example will print the numbers from 1 to 10:
 ```js
 a = 10
 do {
-  print(@a, "A: ", a)
+  print("A: ", a)
   a--
 } while (a)
 ```
@@ -56,7 +56,7 @@ The following example will print the numbers from 1 to 10:
 ```js
 a = 10
 until (a == 0) {
-  print(@a, "A: ", a)
+  print("A: ", a)
 }
 ```
 
@@ -70,7 +70,7 @@ The following example will print the numbers from 1 to 10:
 ```js
 a = 10
 do {
-  print(@a, "A: ", a)
+  print("A: ", a)
 } until (a == 0)
 ```
 
@@ -83,7 +83,7 @@ The following example will print the numbers from 1 to 10:
 
 ```js
 for (a = 1; a <= 10; a++) {
-  print(@a, "A: ", a)
+  print("A: ", a)
 }
 ```
 
