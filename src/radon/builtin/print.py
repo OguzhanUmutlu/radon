@@ -1,6 +1,6 @@
 from typing import List
 
-from src.radon.cpl.selector import CplSelector
+from ..cpl.selector import CplSelector
 from ..cpl._base import CompileTimeValue
 from ..cpl.int import CplInt
 from ..error import raise_syntax_error
