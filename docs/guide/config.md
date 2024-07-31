@@ -11,6 +11,7 @@ The default config is:
   "description": "",
   "format": 48,
   "main": "src/main.rn",
+  "data": "src/data",
   "outFolder": ".",
   "useLock": false
 }
@@ -35,6 +36,10 @@ the `data/my_namespace/functions` folder, for >=1.21 it will be `data/minecraft/
 
 Main file will be the root of the code and parsing will start from here. Its content will also be included in the load
 file.
+
+## Data folder
+
+The contents of this folder will be copied to the output folder's `/data/` folder
 
 ## Out folder
 
