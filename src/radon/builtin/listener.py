@@ -83,9 +83,10 @@ def listener_on(ctx, arguments, token):
     if event == "rejoin":
         obj_type = "custom:leave_game"
     # only a-z allowed, use regex
+    event_str = str(get_str_count(event))
     file_name = (f"__events__/{event}"
                  if re.fullmatch(r"[a-z_]+", event)
-                 else f"__events__/{get_str_count(event)}")
+                 else f"__events__/{event_str}")
 
     if file_name not in tr.files:
 
@@ -101,19 +102,19 @@ def listener_on(ctx, arguments, token):
         elif event == "carrot_on_a_stick" or event == "warped_fungus_on_a_stick":
             stick_init(tr, file_name, event)
         else:
-            tr.files[file_name].insert(0, f"scoreboard players set @s on_{event} 0")
-            tr.load_file.append(f"scoreboard objectives add on_{event} {obj_type}")
+            tr.files[file_name].insert(0, f"scoreboard players set @s on_{event_str} 0")
+            tr.load_file.append(f"scoreboard objectives add on_{event_str} {obj_type}")
             tr.tick_file.insert(0,
-                                "execute as @a[scores={on_" + event + "=1..}] at @s run function " + tr.pack_namespace + ":" + file_name)
+                                "execute as @a[scores={on_" + event_str + "=1..}] at @s run function " + tr.pack_namespace + ":" + file_name)
 
     arg1_fn = tr.get_fn(arg1.value, [], token)
 
     eid = get_expr_id()
 
     tr.files[file_name].append(
-        f"execute if score __event__{event}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
+        f"execute if score __event__{event_str}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
 
-    ctx.file.append(f"scoreboard players set @s __event__{event}_{eid} 1")
+    ctx.file.append(f"scoreboard players set @s __event__{event_str}_{eid} 1")
 
     return CplInt(token, 0)  # returns 0 as an int
 
