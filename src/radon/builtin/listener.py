@@ -82,6 +82,10 @@ def listener_on(ctx, arguments, token):
 
     if event == "rejoin":
         obj_type = "custom:leave_game"
+    if event == "sneak":
+        obj_type = "custom:sneak_time"
+    if event == "sprint":
+        obj_type = "custom:sprint_one_cm"
     # only a-z allowed, use regex
     event_str = str(get_str_count(event))
     file_name = (f"__events__/{event}"
@@ -113,6 +117,8 @@ def listener_on(ctx, arguments, token):
 
     tr.files[file_name].append(
         f"execute if score __event__{event_str}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")
+
+    ctx.file.append(f"scoreboard players set @s__event__{event_str}_{eid} __temp__ 1")
 
     return CplInt(token, 0)  # returns 0 as an int
 
