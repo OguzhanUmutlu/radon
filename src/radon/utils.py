@@ -3,11 +3,15 @@ from typing import Dict, Union, List, Any
 
 FLOAT_PREC = 1000
 INT_LIMIT = 2147483647
-FLOAT_LIMIT = INT_LIMIT / FLOAT_PREC  # 2147483.647
+
+
+def get_float_limit():
+    return INT_LIMIT / FLOAT_PREC
+
 
 _expr_id = 0
 
-VERSION_RADON = "1.2.4"
+VERSION_RADON = "1.2.5"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:

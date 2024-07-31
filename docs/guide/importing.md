@@ -1,6 +1,36 @@
 # Importing
 
-In Radon, currently you can only import `mcfunction` and `python` files. Importing radon files will be implemented.
+In Radon, currently you can only import `radon`, `mcfunction` and `python` files. Importing radon files will be implemented.
+
+## Importing radon files
+
+When radon files are imported, their content will be transpiled from the line that file was imported from.
+
+Example:
+
+```js
+// my_file.rn
+
+print("Hello!")
+```
+
+```js
+// main.rn
+
+print("Importing it!")
+
+import "my_file.rn"
+
+print("The Hello message should be on top of this!")
+```
+
+This will be executed like so:
+
+```js
+print("Importing it!")
+print("Hello!")
+print("The Hello message should be on top of this!")
+```
 
 ## Importing mcfunction files
 

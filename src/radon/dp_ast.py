@@ -682,22 +682,21 @@ def parse_iterate(
 
     if t0.value == "import":
         t1 = next_token(tokens, index)
-        if t1 is None or (t1.type != TokenType.IDENTIFIER and t1.type != TokenType.STRING_LITERAL):
-            raise_syntax_error("Expected an identifier or a path", t0)
+        if t1 is None or t1.type != TokenType.STRING_LITERAL:
+            raise_syntax_error("Expected a path for the import statement", t0)
             return False
 
         _as = None
 
-        if t1.type == TokenType.STRING_LITERAL:
-            t2 = next_token(tokens, index)
-            if t2 is None or t2.value != "as":
-                raise_syntax_error("Expected an 'as' keyword", t1)
-
+        t2 = next_token(tokens, index)
+        if t2 and t2.value == "as":
             t3 = next_token(tokens, index)
             if t3 is None or t3.type != TokenType.IDENTIFIER:
                 raise_syntax_error("Expected an identifier", t2)
 
             _as = t3
+        else:
+            index[0] -= 1
 
         statement = ImportStatement(
             code=t0.code, start=t0.start, end=(_as or t1).end, path=t1, as_=_as

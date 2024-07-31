@@ -110,7 +110,8 @@ def build_dir():
             pack_namespace=config["namespace"],
             pack_description=config["description"],
             pack_format=get_pack_format(config["format"]),
-            main_dir=config["main"] + "/../")
+            main_dir=config["main"] + "/../",
+            main_file_path=config["main"])
     except SyntaxError as e:
         return str(e)
     except Exception as e:

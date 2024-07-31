@@ -47,7 +47,7 @@ from .utils import (
     TokenType,
     get_expr_id,
     INT_LIMIT,
-    FLOAT_LIMIT, CplDefArray, reset_expr_id, FLOAT_PREC, CplDefFunction
+    CplDefArray, reset_expr_id, FLOAT_PREC, CplDefFunction, get_float_limit
 )
 
 cwd = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -160,6 +160,7 @@ class TranspilerContext:
             transpiler,  # type: Transpiler
             file_name: str,
             file: List[str],
+            radon_path: str,
             function: FunctionDeclaration | None = None,
             loop: LoopDeclaration | Any | None = None,
             class_name: str | None = None
@@ -167,6 +168,7 @@ class TranspilerContext:
         self.transpiler = transpiler
         self.file_name = file_name
         self.file = file
+        self.radon_path = radon_path
         self.function = function
         self.loop = loop
         self.class_name = class_name
@@ -294,7 +296,8 @@ def _get_def(v: CompileTimeValue | CplDef):
 
 class Transpiler:
     def __init__(self, statements: List[Statement], macros: List[Statement], pack_namespace: str = "mypack",
-                 pack_description: str = "", pack_format: int = 48, main_dir: str = "./") -> None:
+                 pack_description: str = "", pack_format: int = 48, main_dir: str = "./",
+                 main_file_path: str = "main.rn") -> None:
         reset_expr_id()
         self.files = dict()
         self.dp_files = dict()
@@ -329,6 +332,7 @@ class Transpiler:
                 transpiler=self,
                 file_name="__main__",
                 file=main_file,
+                radon_path=main_file_path,
                 function=None,
                 loop=None),
             statements
@@ -470,6 +474,7 @@ class Transpiler:
                 transpiler=self,
                 file_name=ctx.file_name,
                 file=ctx.file,
+                radon_path=ctx.radon_path,
                 function=None,
                 loop=None,
                 class_name=name
@@ -513,7 +518,7 @@ class Transpiler:
             pt = statement.path.value[1:-1]
             if pt.endswith(".py"):
                 bef = os.getcwd()
-                os.chdir(self.main_dir)
+                os.chdir(os.path.dirname(ctx.radon_path))
                 if not os.path.exists(pt) or not os.path.isfile(pt):
                     os.chdir(bef)
                     raise_syntax_error("File not found", statement)
@@ -546,7 +551,7 @@ class Transpiler:
                 if statement.as_ is None:
                     raise_syntax_error("Expected 'as' in mcfunction import statement", statement)
                 bef = os.getcwd()
-                os.chdir(self.main_dir)
+                os.chdir(os.path.dirname(ctx.radon_path))
                 if not os.path.exists(pt) or not os.path.isfile(pt):
                     os.chdir(bef)
                     raise_syntax_error("File not found", statement)
@@ -559,6 +564,29 @@ class Transpiler:
                     name=statement.as_.value,
                     file_name=f"__imported__/{fn_id}"
                 ))
+                return True
+            if pt.endswith(".rn"):
+                if statement.as_ is not None:
+                    raise_syntax_error("Unexpected 'as' in radon file import statement", statement)
+                bef = os.getcwd()
+                os.chdir(os.path.dirname(ctx.radon_path))
+                if not os.path.exists(pt) or not os.path.isfile(pt):
+                    os.chdir(bef)
+                    raise_syntax_error("File not found", statement)
+                content = open(pt, "r", encoding="utf-8").read()
+                os.chdir(bef)
+                (tokens, macros) = tokenize(content)
+                ctx.transpiler._transpile(
+                    TranspilerContext(
+                        transpiler=ctx.transpiler,
+                        file_name="__main__",
+                        file=self.main_file,
+                        radon_path=pt,
+                        function=None,
+                        loop=None,
+                        class_name=None
+                    ), parse(tokens, macros, list(ctx.transpiler.classes.keys()))
+                )
                 return True
             raise_syntax_error("Invalid import", statement)
         if isinstance(statement, ScheduleStatement):
@@ -597,6 +625,7 @@ class Transpiler:
                     transpiler=self,
                     file_name=ctx.file_name,
                     file=ctx.file,
+                    radon_path=ctx.radon_path,
                     function=ctx.function,
                     loop=statement)
             )
@@ -772,6 +801,7 @@ class Transpiler:
                     transpiler=self,
                     file_name=file_name,
                     file=fn_file,
+                    radon_path=ctx.radon_path,
                     function=f,
                     loop=ctx.loop,
                     class_name=ctx.class_name),
@@ -869,6 +899,7 @@ class Transpiler:
                 transpiler=self,
                 file_name=file_name,
                 file=new_file,
+                radon_path=ctx.radon_path,
                 function=ctx.function,
                 loop=loop), statements
         )
@@ -1145,9 +1176,9 @@ class Transpiler:
                 )
             return CplInt(t, t.value)
         if t.type == TokenType.FLOAT_LITERAL:
-            if abs(float(t.value)) > FLOAT_LIMIT:
+            if abs(float(t.value)) > get_float_limit():
                 raise_syntax_error(
-                    f"A float literal cannot be larger than {FLOAT_LIMIT}", t
+                    f"A float literal cannot be larger than {get_float_limit()}", t
                 )
             return CplFloat(t, t.value)
         if t.type == TokenType.STRING_LITERAL:
