@@ -158,6 +158,10 @@ Executes the given python code.
 
 Adds the given object to the recipes.
 
+## success(minecraft command)
+
+Returns whether the given minecraft command runs successfully.
+
 ## time(): int
 
 Returns the current time in game ticks.

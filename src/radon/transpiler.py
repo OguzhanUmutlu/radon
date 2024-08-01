@@ -271,9 +271,9 @@ def get_module_attr(module):
 
 
 # add lib
-from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe
+from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success
 
-_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe]
+_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success]
 
 
 def get_fn_macro_obj(ctx: TranspilerContext):
@@ -937,7 +937,7 @@ class Transpiler:
             )
         return arguments
 
-    def run_cmd(self, pointer: Token, ctx: TranspilerContext) -> CompileTimeValue:
+    def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> CompileTimeValue:
         file = ctx.file
         cmd = pointer.value
         cmd_str = ""
@@ -1000,11 +1000,11 @@ class Transpiler:
             cmd_str += cmd[i]
             i += 1
 
-        eid = ("int_" + str(get_expr_id()) + " __temp__")  # TODO: Does it have to be an int? Can I allow floats?
+        eid = score_loc or "int_" + str(get_expr_id()) + " __temp__"  # TODO: Does it have to be an int? Can I allow floats?
         eid_val = CplScore(pointer, eid, "int")
 
         if not has_repl:
-            file.append(f"execute store result score {eid} run {cmd_str}")
+            file.append(f"execute store {type} score {eid} run {cmd_str}")
             return eid_val
 
         cmd_file = []
@@ -1019,7 +1019,7 @@ class Transpiler:
         self.files[file_name] = cmd_file
         cmd_file.append("$" + cmd_str)
         file.append(
-            f"execute store result score {eid} run function {self.pack_namespace}:{file_name} with storage cmd_mem"
+            f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage cmd_mem"
         )
         return eid_val
 
@@ -1251,10 +1251,7 @@ class Transpiler:
         t1 = chains[1]
         if t0[0].value in COMMANDS:
             # TODO: use tokens
-            return self.run_cmd(
-                Token(t0[0].code, TokenType.POINTER, t0[0].start, chains[-1][-1].end),
-                ctx,
-            )
+            return self.run_cmd(ctx, Token(t0[0].code, TokenType.POINTER, t0[0].start, chains[-1][-1].end))
         if t1[0].value in INC_OP:
             variable_cpl = self.chain_to_cpl(ctx, t0)
 
@@ -1407,7 +1404,7 @@ class Transpiler:
             if len(built) == 1 and built[0].type == "python-raw":
                 if not base:
                     raise_syntax_error("Cannot run a raw function without tokens", base)
-                return built[0].function(ctx, base)
+                return built[0].function(ctx, base) or built[0].returns
             if len(built) == 1 and built[0].type == "python-cpl":
                 return built[0].function(ctx, args, base)
             self.functions.extend(built)
@@ -1521,7 +1518,7 @@ class Transpiler:
         if t.func.value in builtin_fns:
             built = builtin_fns[t.func.value]
             if len(built) == 1 and built[0].type == "python-raw":
-                return built[0].function(ctx, t)
+                return built[0].function(ctx, t) or built[0].returns
 
         separated = split_tokens(t.children, ",")
         arguments: List[CompileTimeValue] = []
