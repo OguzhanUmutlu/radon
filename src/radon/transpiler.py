@@ -350,7 +350,7 @@ class Transpiler:
 
         # remove the lines after immediate returns
         for file in self.files:
-            if self.files[file] is load_file:
+            if file == "__load__":
                 continue
             lines = self.files[file]
             if len(lines) == 0:
@@ -1030,7 +1030,7 @@ class Transpiler:
         cmd_file = []
         file_name = None
         for i in self.files:
-            if "\n".join(self.files[i]) == "\n".join(cmd_file):
+            if "\n".join(self.files[i]) == "\n".join(cmd_file) and i != "__load__":
                 file_name = i
                 break
         if file_name is None:
