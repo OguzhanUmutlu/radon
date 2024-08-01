@@ -1030,7 +1030,7 @@ class Transpiler:
         cmd_file = []
         file_name = None
         for i in self.files:
-            if "\n".join(self.files[i]) == "\n".join(cmd_file) and i != "__load__":
+            if "\n".join(self.files[i]) == "\n".join(cmd_file) and i.startswith("__cmd__/"):
                 file_name = i
                 break
         if file_name is None:
