@@ -7,6 +7,9 @@ INT_ARRAY_TYPE = arr(INT_TYPE)
 FLOAT_ARRAY_TYPE = arr(FLOAT_TYPE)
 UUID_TYPE = INT_ARRAY_TYPE
 
+ENTITIES_OBJ = obj({})
+BLOCKS_Properties = obj({})  # TODO: this
+
 ITEMS__Tag = obj({"Damage": INT_TYPE})  # Not finished
 ITEMS__Attribute = obj(
     {"AttributeName": STRING_TYPE, "Amount": FLOAT_TYPE, "Slot": STRING_TYPE, "Operation": INT_TYPE,
@@ -22,7 +25,7 @@ ENTITIES__Attribute = obj({"name": STRING_TYPE, "Base": FLOAT_TYPE, "Modifiers":
 ITEMS_Item = obj({"id": STRING_TYPE, "Count": INT_TYPE, "tag": ITEMS__Tag})
 ITEMS_Enchantments = arr(obj({"id": STRING_TYPE, "lvl": INT_TYPE}))
 ITEMS_StoredEnchantments = ITEMS_Enchantments
-ITEMS_EntityTag = ENTITIES_EntityNbt
+ITEMS_EntityTag = ENTITIES_OBJ
 ITEMS_display = obj({"Name": STRING_TYPE, "Lore": STRING_ARRAY_TYPE, "color": INT_TYPE})
 ITEMS_AttributeModifiers = arr(ITEMS__Attribute)
 ITEMS_Unbreakable = INT_TYPE
@@ -41,8 +44,6 @@ ITEMS_Fireworks = obj({"Explosions": arr(ITEMS__FireworkExplosion), "Flight": IN
 ITEMS_CanPlaceOn = STRING_ARRAY_TYPE
 ITEMS_BlockEntityTag = obj({})  # Not finished
 ITEMS_BlockStateTag = obj({"facing": STRING_TYPE, "half": STRING_TYPE, "shape": STRING_TYPE})
-
-ENTITIES_OBJ = obj({})
 
 # Entities
 ENTITIES_TileEntityData = ENTITIES_OBJ

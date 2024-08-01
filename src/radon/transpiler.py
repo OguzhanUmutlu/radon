@@ -27,6 +27,7 @@ from .dp_ast import (
     parse_str, parse
 )
 from .error import raise_syntax_error, raise_syntax_error_t, show_warning, raise_error
+from .nbt_definitions import ENTITIES_OBJ
 from .tokenizer import (
     BlockIdentifierToken,
     GroupToken,
@@ -1076,12 +1077,13 @@ class Transpiler:
                 return None
             var = self.variables[name]
             var_type = var.type
+            force_nbt = name in ENTITIES_OBJ.content
             return _type_to_cpl(
                 t,
                 var_type,
-                score_loc=f"",
+                score_loc=f"" if force_nbt else f"{t.selector.value} {name}",
                 nbt_loc=self._nbt_var_loc(ctx, t),
-                force_nbt=True  # for now
+                force_nbt=force_nbt
             )
         if isinstance(t, BlockIdentifierToken):
             name = t.name.value
