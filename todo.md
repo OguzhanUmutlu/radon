@@ -11,7 +11,6 @@
 - [ ] Storing functions in variables? (by making a run_function function that runs the given function either via macros
   or by checking every function to see if it fits)
 - [ ] Defining/running functions with directories
-- [ ] Anonymous functions
 - [ ] String manipulations: <string>.split(<string>), <array>.join(<string>), <string>
   .replace(<string>, <string>), <string>.toArray()
 - [ ] A macro function for loading schematic files into the world

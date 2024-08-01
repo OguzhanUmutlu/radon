@@ -1259,7 +1259,7 @@ class Transpiler:
                 "auto"
             ))
             return CplString(t, name, is_fn_reference=True)
-        raise_syntax_error("Invalid expression", t)
+        # raise_syntax_error("Invalid expression", t)
         raise ValueError("")
 
     def chains_to_cpl(
@@ -1274,12 +1274,32 @@ class Transpiler:
         if t0[0].value in COMMANDS:
             # TODO: use tokens
             return self.run_cmd(ctx, Token(t0[0].code, TokenType.POINTER, t0[0].start, chains[-1][-1].end))
+        if t0[0].value in {"not", "!"}:
+            # Basically, 1 - x
+            variable_cpl = self.chain_to_cpl(ctx, t1)
+            if variable_cpl.unique_type.type not in {"int", "float"}:
+                return CplInt(t1[0], 0)
+            if isinstance(variable_cpl, CplInt) or isinstance(variable_cpl, CplFloat):
+                return CplInt(t1[0], 1 - variable_cpl.value)
+
+            temp_score = CplScore(t1[0], f"int_{get_expr_id()}")
+            temp_score.compute(ctx, "=", CplInt(None, 1), t1[0])
+            variable_cpl.compute(ctx, "-=", temp_score, t1[0])
+
+            return temp_score
+        if t0[0].value in INC_OP:
+            variable_cpl = self.chain_to_cpl(ctx, t1)
+
+            variable_cpl.compute(ctx, t0[0].value[0] + "=", CplInt(None, 1), t1[0])
+
+            return variable_cpl
         if t1[0].value in INC_OP:
             variable_cpl = self.chain_to_cpl(ctx, t0)
 
+            cached = variable_cpl.cache(ctx)
             variable_cpl.compute(ctx, t1[0].value[0] + "=", CplInt(None, 1), t0[0])
 
-            return variable_cpl
+            return cached
         constant_keyword = False
         if t0[0].value == "const":
             constant_keyword = True
