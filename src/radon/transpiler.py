@@ -997,8 +997,9 @@ class Transpiler:
                 elif cmd[si + 1] == "s":
                     cmd_str += val.tellraw_object(ctx)
                 elif cmd[si + 1] == "d":
-                    if isinstance(val, CplInt) or isinstance(val, CplFloat):
-                        cmd_str += str(val.value)
+                    py_val = val.get_py_value()
+                    if py_val is not None:
+                        cmd_str += str(py_val)
                     else:
                         cmd_str += val.tellraw_object(ctx)
                 elif cmd[si + 1] == "j":
