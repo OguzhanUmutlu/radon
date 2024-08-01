@@ -531,18 +531,19 @@ def _tokenize_iterate(
             and len(tokens) > 0
             and tokens[-1].value == "."
             and tokens[-1].end == start_index
-            and (
-            len(tokens) == 1
-            or tokens[-2].end != start_index - 1
-            or tokens[-2].type == TokenType.INT_LITERAL
-    )
-    ):
+            and (len(tokens) == 1 or tokens[-2].end != start_index - 1 or tokens[-2].type == TokenType.INT_LITERAL)):
         if len(tokens) > 1 and tokens[-2].type == TokenType.INT_LITERAL:
             tokens.pop()
         start = tokens.pop().start
         tokens.append(Token(code, TokenType.FLOAT_LITERAL, start, index[0] + 1))
         return True
-    tokens.append(Token(code, type, start_index, index[0] + 1))
+    new_t = Token(code, type, start_index, index[0] + 1)
+    if type == TokenType.IDENTIFIER and len(tokens) > 1 and tokens[-1].value == ":" and tokens[-2].type == TokenType.IDENTIFIER:
+        sep = tokens.pop()
+        ident = tokens.pop()
+        tokens.append(SelectorIdentifierToken(code, ident.start, index[0] + 1, new_t, sep, ident))
+        return True
+    tokens.append(new_t)
 
 
 def _tokenize(code: str, can_macro=True):
