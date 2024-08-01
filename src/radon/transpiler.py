@@ -962,6 +962,7 @@ class Transpiler:
                     cmd[i: i + 2] == "$("
                     or cmd[i: i + 5] == "$str("
                     or cmd[i: i + 5] == "$jstr("
+                    or cmd[i: i + 5] == "$dstr("
             ):
                 si = i
                 k = 0
@@ -992,6 +993,11 @@ class Transpiler:
 
                 elif cmd[si + 1] == "s":
                     cmd_str += val.tellraw_object(ctx)
+                elif cmd[si + 1] == "d":
+                    if isinstance(val, CplInt) or isinstance(val, CplFloat):
+                        cmd_str += str(val.value)
+                    else:
+                        cmd_str += val.tellraw_object(ctx)
                 elif cmd[si + 1] == "j":
                     cmd_str += json.dumps(val.tellraw_object(ctx))
 
@@ -1000,7 +1006,8 @@ class Transpiler:
             cmd_str += cmd[i]
             i += 1
 
-        eid = score_loc or "int_" + str(get_expr_id()) + " __temp__"  # TODO: Does it have to be an int? Can I allow floats?
+        eid = score_loc or "int_" + str(
+            get_expr_id()) + " __temp__"  # TODO: Does it have to be an int? Can I allow floats?
         eid_val = CplScore(pointer, eid, "int")
 
         if not has_repl:
