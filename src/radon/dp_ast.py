@@ -1117,28 +1117,35 @@ def parse_iterate(
         return True
 
     if t0.value in EXECUTE_MACROS:
-        # as @a at @s ... { <body> }
-        got_tokens = [t0]
-        body_g: GroupToken
-        while True:
-            t = next_token(tokens, index)
-            if t is None:
-                raise_syntax_error("Unexpected end of file", got_tokens[-1])
-                raise SyntaxError("")
-            if isinstance(t, GroupToken) and t.open.value == "{":
-                body_g = t
+        i_start = index[0]
+        is_exec_macro = False
+        for tk in tokens[i_start:]:
+            if isinstance(tk,GroupToken) and tk.open.value == "{":
+                is_exec_macro = True
                 break
-            got_tokens.append(t)
+        if is_exec_macro:
+            # as @a at @s ... { <body> }
+            got_tokens = [t0]
+            body_g: GroupToken
+            while True:
+                t = next_token(tokens, index)
+                if t is None:
+                    raise_syntax_error("Unexpected end of file", got_tokens[-1])
+                    raise SyntaxError("")
+                if isinstance(t, GroupToken) and t.open.value == "{":
+                    body_g = t
+                    break
+                got_tokens.append(t)
 
-        statement = ExecuteMacroStatement(
-            code=t0.code,
-            start=t0.start,
-            end=got_tokens[-1].end,
-            command=" ".join(t.value for t in got_tokens),
-            body=parse(body_g.children, macros, class_names),
-        )
-        statements.append(statement)
-        return True
+            statement = ExecuteMacroStatement(
+                code=t0.code,
+                start=t0.start,
+                end=got_tokens[-1].end,
+                command=" ".join(t.value for t in got_tokens),
+                body=parse(body_g.children, macros, class_names),
+            )
+            statements.append(statement)
+            return True
 
     (ind, expr_tokens) = read_expression(tokens, index[0])
     if ind is None:
