@@ -865,9 +865,13 @@ class Transpiler:
             return True
         if isinstance(statement, ExecuteMacroStatement):
             exec_name = self._run_safe("__execute__", statement.body, ctx)
-            ctx.file.append(
-                f"execute {statement.command} run function {self.pack_namespace}:{exec_name}"
-            )
+            cmd_str, has_repl = self.proc_cmd(ctx, statement.command)
+            if has_repl:
+                fid = f"__execute__/{get_expr_id()}"
+                self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}"]
+                ctx.file.append(f"function {self.pack_namespace}:{fid} with storage cmd_mem")
+            else:
+                ctx.file.append(f"execute {cmd_str} run function {self.pack_namespace}:{exec_name}")
             _return_safe(ctx)
             return True
         raise_syntax_error("Invalid statement", statement)
@@ -937,9 +941,7 @@ class Transpiler:
             )
         return arguments
 
-    def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> CompileTimeValue:
-        file = ctx.file
-        cmd = pointer.value
+    def proc_cmd(self, ctx: TranspilerContext, cmd: str):
         cmd_str = ""
         i = 0
         has_repl = False
@@ -1009,6 +1011,13 @@ class Transpiler:
                 continue
             cmd_str += cmd[i]
             i += 1
+
+        return cmd_str, has_repl
+
+    def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> CompileTimeValue:
+        file = ctx.file
+        cmd = pointer.value
+        cmd_str, has_repl = self.proc_cmd(ctx, cmd)
 
         eid = score_loc or "int_" + str(
             get_expr_id()) + " __temp__"  # TODO: Does it have to be an int? Can I allow floats?
