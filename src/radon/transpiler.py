@@ -961,15 +961,18 @@ class Transpiler:
             if (
                     cmd[i: i + 2] == "$("
                     or cmd[i: i + 5] == "$str("
-                    or cmd[i: i + 5] == "$jstr("
-                    or cmd[i: i + 5] == "$dstr("
+                    or cmd[i: i + 6] == "$jstr("
+                    or cmd[i: i + 6] == "$dstr("
             ):
                 si = i
                 k = 0
+                fp = 0
                 while i < len(cmd):
                     i += 1
                     c = cmd[i]
                     if c == "(":
+                        if fp == 0:
+                            fp = i
                         k += 1
                     if c == ")":
                         k -= 1
@@ -977,7 +980,7 @@ class Transpiler:
                             break
                 if cmd[i] != ")":
                     raise_syntax_error_t("Unterminated parentheses", cmd, si, i + 1)
-                repl = cmd[si + (2 if cmd[si + 1] == "(" else 5): i]
+                repl = cmd[fp + 1: i]
                 (expr_tokens, _) = tokenize(repl)
                 expr_tokens = expr_tokens[:-1]
                 val = self.tokens_to_cpl(ctx, expr_tokens)
