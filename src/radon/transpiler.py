@@ -1028,10 +1028,10 @@ class Transpiler:
 
         cmd_file = []
         file_name = None
-        for i in self.files:
+        '''for i in self.files:
             if "\n".join(self.files[i]) == "\n".join(cmd_file) and i.startswith("__cmd__/"):
                 file_name = i
-                break
+                break'''
         if file_name is None:
             cmd_id = get_expr_id()
             file_name = f"__cmd__/{cmd_id}"

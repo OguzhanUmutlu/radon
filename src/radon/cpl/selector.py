@@ -1,5 +1,8 @@
 from ._base import CompileTimeValue
+from .nbt import val_nbt
+from .string import CplString
 from ..error import raise_syntax_error
+from ..nbt_definitions import ENTITIES_OBJ
 from ..tokenizer import Token
 from ..utils import SELECTOR_TYPE, get_expr_id
 
@@ -13,6 +16,13 @@ class CplSelector(CompileTimeValue):
 
     def get_py_value(self):
         return None
+
+    def _get_index(self, ctx, index):
+        if not isinstance(index, CplString):
+            return None
+        if index.value not in ENTITIES_OBJ.content:
+            return None
+        return val_nbt(self.token, f"entity {self.value} {index.value}", ENTITIES_OBJ.content[index.value])
 
     def _cache(self, ctx, score_loc=None, nbt_loc=None, force=None, force_t=None):
         raise_syntax_error("Selectors cannot be stored", self.token)

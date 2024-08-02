@@ -64,13 +64,13 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     stop_iter = f"scoreboard players set {iter_eid} -1"
     ns = ctx.transpiler.pack_namespace
 
-    hit_entity = get_fn_or_none(ctx, args, 0, token)
-    hit_block = get_fn_or_none(ctx, args, 1, token)
-    hit_fail = get_fn_or_none(ctx, args, 2, token)
+    entity_fn = get_fn_or_none(ctx, args, 0, token)
+    block_fn = get_fn_or_none(ctx, args, 1, token)
+    step_fn = get_fn_or_none(ctx, args, 2, token)
+    fail_fn = get_fn_or_none(ctx, args, 3, token)
 
-    run_hit_entity = f"function {ns}:__raycast__/{raycast_id}/collide_entity"
-    run_hit_block = f"function {ns}:__raycast__/{raycast_id}/collide_block"
-    run_fail = f"function {ns}:{hit_fail}"
+    entity_file = f"__raycast__/{raycast_id}/collide_entity" if entity_fn else ""
+    block_file = f"__raycast__/{raycast_id}/collide_block" if block_fn else ""
 
     ctx.file.extend([
         "tag @s add __raycast__self__",
@@ -79,21 +79,42 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
         "tag @s remove __raycast__self__"
     ])
     ctx.transpiler.files[f"__raycast__/{raycast_id}/loop"] = [
-        f"execute positioned ~-0.95 ~-0.95 ~-0.95 as @e[dx=0,tag=!__raycast__self__] positioned ~0.9 ~0.9 ~0.9 if entity @s[dx=0] positioned ~0.05 ~0.05 ~0.05 run {run_hit_entity}" if hit_entity else "",
-        f"execute if score {iter_eid} matches 1.. run scoreboard players remove {iter_eid} 1",
-        f"execute unless block ~ ~ ~ #{ns}:__raycast__/default_raycast_pass run {run_hit_block}" if hit_block else "",
-        f"execute unless score {iter_eid} matches 1.. run {run_fail}" if run_fail else "",
-        f"execute if score {iter_eid} matches 1.. positioned ^ ^ ^0.1 run function {ns}:__raycast__/{raycast_id}/loop"
+        f"function {ns}:{step_fn}" if step_fn else "",
+
+        f"execute "
+        f"positioned ~-0.95 ~-0.95 ~-0.95 "
+        f"as @e[dx=0,tag=!__raycast__self__] "
+        f"positioned ~0.9 ~0.9 ~0.9 "
+        f"if entity @s[dx=0] "
+        f"positioned ~0.05 ~0.05 ~0.05 "
+        f"run function {ns}:{entity_file}" if entity_fn else "",
+
+        f"execute "
+        f"if score {iter_eid} matches 1.. "
+        f"run scoreboard players remove {iter_eid} 1",
+
+        f"execute "
+        f"unless block ~ ~ ~ #{ns}:__raycast__/default_raycast_pass "
+        f"run function {ns}:{block_file}" if block_fn else "",
+
+        f"execute "
+        f"unless score {iter_eid} matches 1.. "
+        f"run function {ns}:{fail_fn}" if fail_fn else "",
+
+        f"execute "
+        f"if score {iter_eid} matches 1.. "
+        f"positioned ^ ^ ^0.1 "
+        f"run function {ns}:__raycast__/{raycast_id}/loop"
     ]
-    if hit_entity:
+    if entity_fn:
         ctx.transpiler.files[f"__raycast__/{raycast_id}/collide_entity"] = [
             stop_iter,
-            f"function {ns}:{hit_entity}"
+            f"function {ns}:{entity_fn}"
         ]
-    if hit_block:
+    if block_fn:
         ctx.transpiler.files[f"__raycast__/{raycast_id}/collide_block"] = [
             stop_iter,
-            f"function {ns}:{hit_block}"
+            f"function {ns}:{block_fn}"
         ]
     return CplInt(token, 0)
 

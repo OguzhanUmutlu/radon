@@ -453,6 +453,7 @@ def chain_tokens_iterate(tokens: List[Token], index: List[int]) -> List[Token]:
         TokenType.FLOAT_LITERAL,
         TokenType.STRING_LITERAL,
         TokenType.FUNCTION_CALL,
+        TokenType.SELECTOR,
     } or (isinstance(t0, GroupToken) and t0.open.value not in {"(", "["}):
         return branch
     while True:
@@ -472,6 +473,8 @@ def chain_tokens_iterate(tokens: List[Token], index: List[int]) -> List[Token]:
                         or tn.type == TokenType.BLOCK_IDENTIFIER
                         or tn.type == TokenType.SELECTOR_IDENTIFIER
                         or tn.type == TokenType.INT_LITERAL
+                        or tn.type == TokenType.FLOAT_LITERAL
+                        or tn.type == TokenType.SELECTOR
                 )
                 and tl.value == "."
                 and tl.end == tn.start
@@ -1123,7 +1126,7 @@ def parse_iterate(
         i_start = index[0]
         is_exec_macro = False
         for tk in tokens[i_start:]:
-            if isinstance(tk,GroupToken) and tk.open.value == "{":
+            if isinstance(tk, GroupToken) and tk.open.value == "{":
                 is_exec_macro = True
                 break
         if is_exec_macro:
