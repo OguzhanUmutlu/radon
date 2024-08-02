@@ -33,7 +33,7 @@ def lib_print_subtitle(ctx: TranspilerContext, args: List[CompileTimeValue], tok
 
 
 def lib_print_actionbar(ctx: TranspilerContext, args: List[CompileTimeValue], token):
-    return _lib_print(ctx, args, token, "title @ subtitle", "printActionbar")
+    return _lib_print(ctx, args, token, "title @ actionbar", "printActionbar")
 
 
 add_lib(FunctionDeclaration(
