@@ -2,7 +2,7 @@ import json
 from typing import List
 
 from ..cpl._base import CompileTimeValue
-from ..cpl.int import CplInt
+from ..cpl.score import CplScore
 from ..cpl.string import CplString
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import get_expr_id
@@ -61,6 +61,7 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     })
     raycast_id = get_expr_id()
     iter_eid = f"int_{raycast_id} __temp__"
+    success_eid = f"int_raycast_success_{raycast_id} __temp__"
     stop_iter = f"scoreboard players set {iter_eid} -1"
     ns = ctx.transpiler.pack_namespace
 
@@ -71,8 +72,10 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
     entity_file = f"__raycast__/{raycast_id}/collide_entity" if entity_fn else ""
     block_file = f"__raycast__/{raycast_id}/collide_block" if block_fn else ""
+    fail_file = f"__raycast__/{raycast_id}/fail" if fail_fn else ""
 
     ctx.file.extend([
+        f"scoreboard players set {success_eid} 1",
         "tag @s add __raycast__self__",
         f"scoreboard players set {iter_eid} 1000",
         f"execute anchored eyes positioned ^ ^ ^0.1 run function {ns}:__raycast__/{raycast_id}/loop",
@@ -99,7 +102,7 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
         f"execute "
         f"unless score {iter_eid} matches 1.. "
-        f"run function {ns}:{fail_fn}" if fail_fn else "",
+        f"run function {ns}:{fail_file}" if fail_fn else "",
 
         f"execute "
         f"if score {iter_eid} matches 1.. "
@@ -116,7 +119,12 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
             stop_iter,
             f"function {ns}:{block_fn}"
         ]
-    return CplInt(token, 0)
+    if fail_fn:
+        ctx.transpiler.files[f"__raycast__/{raycast_id}/fail"] = [
+            f"scoreboard players set {success_eid} 0",
+            f"function {ns}:{fail_fn}"
+        ]
+    return CplScore(token, success_eid)
 
 
 add_lib(FunctionDeclaration(

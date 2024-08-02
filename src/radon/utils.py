@@ -11,7 +11,7 @@ def get_float_limit():
 
 _expr_id = 0
 
-VERSION_RADON = "1.5.4"
+VERSION_RADON = "1.5.5"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:

@@ -80,7 +80,7 @@ Listener.on("jump", () => {
 })
 ```
 
-## raycast(callback on_hit_entity = false, callback on_hit_block = false, callback on_fail = false)
+## raycast(callback on_hit_entity = null, callback on_hit_block = null, callback on_step = null, callback on_fail = null)
 
 Runs raycast at the current scope's position. Entity callback will be called as the entity. Block callback will be
 called positioned at the block.
@@ -89,9 +89,17 @@ You can configure the starting position and rotation using the execute macros:
 
 ```js
 as @p positioned 10 5 4 facing 8 5 2 {
-    raycast(() => {
-        print("uuid of the entity hit: ", UUID:@s)
+    success = raycast(() => {
+        print("Hit an entity with the following uuid: ", @s.UUID)
+    }, () => {
+        print("Hit a block at the following position: ", getpos())
+    }, () => {
+        print("Raycaster is stepping...")
+    }, () => {
+        print("Raycaster didn't hit anything! Infinity and beyond...")
     })
+    
+    print("Raycaster's succession as a boolean: ", success)
 }
 ```
 
