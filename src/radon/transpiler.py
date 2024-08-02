@@ -348,7 +348,7 @@ class Transpiler:
             if self.tick_file:
                 self.files["tick"] = self.tick_file
         else:
-            self.tick_file += self.files["tick"]
+            self.files["tick"] = self.tick_file + self.files["tick"]
 
         if len(self.variables.keys()) > 0:
             self.load_file.insert(0, 'scoreboard objectives add global dummy "global"')
