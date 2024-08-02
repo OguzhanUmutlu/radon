@@ -368,7 +368,7 @@ class Transpiler:
                         self.load_file.insert(0, 'scoreboard objectives add __temp__ dummy "__temp__"')
                     if "FLOAT_PREC __temp__" in line and "float_prec" not in self.data:
                         self.data["float_prec"] = True
-                        self.load_file.append(f"scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}")
+                        self.load_file.insert(1, f"scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}")
                 if line.startswith("return"):
                     break
             self.files[file] = lines[: index + 1]
@@ -813,8 +813,7 @@ class Transpiler:
                 fn_file.insert(0, f"data modify storage variables this append {cls.sample.get_data_str(ctx)}")
             if f.returns == "auto":
                 f.returns = "void"
-            if f.returns != "void":
-                fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
+            fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
             return True
         if isinstance(statement, ReturnStatement):
             if not ctx.function:
