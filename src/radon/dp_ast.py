@@ -977,6 +977,9 @@ def parse_iterate(
             else_body=None,
         )
         statements.append(statement)
+        if t0.value == "unless":
+            statement.elseBody = stats
+            statement.body = []
         return True
 
     if t0.value == "define":
