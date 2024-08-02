@@ -80,7 +80,7 @@ Listener.on("jump", () => {
 })
 ```
 
-## raycast(callback on_hit_entity = false, callback on_hit_block = false)
+## raycast(callback on_hit_entity = false, callback on_hit_block = false, callback on_fail = false)
 
 Runs raycast at the current scope's position. Entity callback will be called as the entity. Block callback will be
 called positioned at the block.
