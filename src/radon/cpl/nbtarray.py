@@ -29,7 +29,7 @@ class CplArrayNBT(CplNBT):
             if not ind.isnumeric():
                 return None
             content = self.unique_type.content
-            return val_nbt(self.token, self.location + "." + ind, content)
+            return val_nbt(self.token, self.location + "[" + ind + "]", content)
 
         return object_get_index_nbt(ctx, self.unique_type.content, self, index)
 
