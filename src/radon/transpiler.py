@@ -846,8 +846,7 @@ class Transpiler:
             if ctx.file is not self.files[ctx.function.file_name]:
                 ctx.file.append(f"scoreboard players set __returned__ __temp__ 1")
             ctx.file.append(f"return 0")
-            if ctx.file is self.files[ctx.function.file_name]:
-                return
+            return True
         if isinstance(statement, IntroduceVariableStatement):
             name = statement.name.value
             if name in self.variables:
