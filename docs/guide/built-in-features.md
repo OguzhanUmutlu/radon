@@ -80,6 +80,21 @@ Listener.on("jump", () => {
 })
 ```
 
+## raycast(callback on_hit_entity = false, callback on_hit_block = false)
+
+Runs raycast at the current scope's position. Entity callback will be called as the entity. Block callback will be
+called positioned at the block.
+
+You can configure the starting position and rotation using the execute macros:
+
+```js
+as @p positioned 10 5 4 facing 8 5 2 {
+    raycast(() => {
+        print("uuid of the entity hit: ", UUID:@s)
+    })
+}
+```
+
 ## Math.sqrt(int | float): float
 
 Returns the square root of an int or float.
@@ -169,6 +184,10 @@ Returns the current time in game ticks.
 ## ftime(): float
 
 Returns the current time in seconds as a float.
+
+## getpos(): float[]
+
+Returns the current position the function is running from. Works by summoning a marker and using its Pos NBT.
 
 ## exit(any)
 

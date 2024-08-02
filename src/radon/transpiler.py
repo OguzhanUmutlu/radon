@@ -127,10 +127,13 @@ class FunctionDeclaration:
             arguments: List[FunctionArgument] = None,
             function: Any = None,
             file_name: str = "",
-            class_name: str | None = None
+            class_name: str | None = None,
+            raw_args: List[int] = None
     ):
         if arguments is None:
             arguments = []
+        if raw_args is None:
+            raw_args = []
         self.type = type
         self.name = name
         self.file_name = file_name
@@ -138,6 +141,7 @@ class FunctionDeclaration:
         self.arguments: List[FunctionArgument] = arguments
         self.function = function
         self.class_name = class_name
+        self.raw_args = raw_args
 
 
 class ClassDeclaration:
@@ -272,9 +276,9 @@ def get_module_attr(module):
 
 
 # add lib
-from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success
+from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos
 
-_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success]
+_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos]
 
 
 def get_fn_macro_obj(ctx: TranspilerContext):
@@ -439,7 +443,7 @@ class Transpiler:
     def assert_args(self, name, args1, args2, base):
         if not self.check_args(args1, args2, base):
             raise_syntax_error(
-                f"Invalid arguments. Expected usage: {name}({', '.join(map(str, args1))})" + ", but got: " + name + "",
+                f"Invalid arguments. Expected usage: {name}({', '.join(map(str, args1))}), but got: {name}({', '.join(map(str, args2))})",
                 base)
 
     def get_fn(self, name, arguments: List[CompileTimeValue | CplDef], base) -> FunctionDeclaration | None:
@@ -720,10 +724,6 @@ class Transpiler:
                     return True
             return True
         if isinstance(statement, DefineFunctionStatement):
-            if ctx.function or ctx.loop:
-                raise_syntax_error(
-                    "Functions should be declared in the main scope", statement
-                )
             fn_name = statement.name.value
             if ctx.class_name is not None and fn_name != ctx.class_name:
                 fn_name = f"{ctx.class_name}.{fn_name}"
@@ -1073,17 +1073,24 @@ class Transpiler:
     ) -> Union[CompileTimeValue, None]:
         if isinstance(t, SelectorIdentifierToken):
             name = t.name.value
+            if name in ENTITIES_OBJ.content:
+                return _type_to_cpl(
+                    t,
+                    ENTITIES_OBJ.content[name],
+                    score_loc="",
+                    nbt_loc=self._nbt_var_loc(ctx, t),
+                    force_nbt=True
+                )
             if name not in self.variables:
                 return None
             var = self.variables[name]
             var_type = var.type
-            force_nbt = name in ENTITIES_OBJ.content
             return _type_to_cpl(
                 t,
                 var_type,
-                score_loc=f"" if force_nbt else f"{t.selector.value} {name}",
+                score_loc=f"{t.selector.value} {name}",
                 nbt_loc=self._nbt_var_loc(ctx, t),
-                force_nbt=force_nbt
+                force_nbt=False
             )
         if isinstance(t, BlockIdentifierToken):
             name = t.name.value
@@ -1557,15 +1564,19 @@ class Transpiler:
         if not t.func:
             return CplInt(t, 0)
 
+        raw_args = []
+
         if t.func.value in builtin_fns:
             built = builtin_fns[t.func.value]
             if len(built) == 1 and built[0].type == "python-raw":
                 return built[0].function(ctx, t) or built[0].returns
+            if len(built) == 1 and built[0].type == "python-cpl":
+                raw_args = built[0].raw_args
 
         separated = split_tokens(t.children, ",")
         arguments: List[CompileTimeValue] = []
-        for arg in separated:
-            arguments.append(self.tokens_to_cpl(ctx, arg))
+        for index, arg in enumerate(separated):
+            arguments.append(arg if index in raw_args else self.tokens_to_cpl(ctx, arg))
 
         return self.run_function_with_cpl(ctx, t.func.value, arguments, base=t)
 

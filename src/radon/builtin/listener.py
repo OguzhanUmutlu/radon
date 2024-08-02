@@ -68,8 +68,8 @@ def stick_init(tr, file_name, item):
 def listener_on(ctx, arguments, token):
     tr = ctx.transpiler
     if ctx.function or ctx.loop:
-        raise_syntax_error("Player.on() can only be called in the main scope", token)
-    tr.assert_args("Player.on", [
+        raise_syntax_error("Listener.on() can only be called in the main scope", token)
+    tr.assert_args("Listener.on", [
         STRING_TYPE, CplDefFunction([], None)
     ], arguments, token)
     arg0 = arguments[0]
