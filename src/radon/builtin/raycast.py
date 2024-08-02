@@ -88,7 +88,7 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     if hit_block:
         ctx.transpiler.files[f"__raycast__/{raycast_id}/collide_block"] = [
             stop_iter,
-            f"function {ns}:{hit_entity}"
+            f"function {ns}:{hit_block}"
         ]
     return CplInt(token, 0)
 
