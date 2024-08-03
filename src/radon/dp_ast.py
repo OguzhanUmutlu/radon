@@ -1147,7 +1147,7 @@ def parse_iterate(
                 code=t0.code,
                 start=t0.start,
                 end=got_tokens[-1].end,
-                command=" ".join(t.value for t in got_tokens),
+                command=t0.code[got_tokens[0].start: got_tokens[-1].end],
                 body=parse(body_g.children, macros, class_names),
             )
             statements.append(statement)
