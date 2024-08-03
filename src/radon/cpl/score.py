@@ -81,9 +81,9 @@ class CplScore(CompileTimeValue):
     def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         t = self.unique_type.type
         if index == "sqrt":
-            return ctx.transpiler.builtin_vars.call_index(ctx, "isqrt" if t == "int" else "sqrt", [self], token)
+            return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "isqrt" if t == "int" else "sqrt", [self], token)
         if index == "cbrt":
-            return ctx.transpiler.builtin_vars["Math"].value.call_index(ctx, "cbrt", [self], token)
+            return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "cbrt", [self], token)
         if index == "int":
             if len(arguments) > 0:
                 raise_syntax_error("Expected 0 arguments for <score>.int()", self.token)
@@ -243,7 +243,7 @@ class CplScore(CompileTimeValue):
     def _pow(self, ctx, cpl):
         if cpl.unique_type.type == "float":
             return None
-        return ctx.transpiler.builtin_vars["Math"].value.call_index(ctx, "ipow", [self, cpl], self.token)
+        return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token)
 
     def _mod(self, ctx, cpl):
         if cpl.is_lit_eq(0):

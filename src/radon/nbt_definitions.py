@@ -48,6 +48,8 @@ ITEMS_BlockStateTag = obj({"facing": STRING_TYPE, "half": STRING_TYPE, "shape": 
 # Entities
 ENTITIES_UUID = UUID_TYPE
 ENTITIES_Pos = INT_ARRAY_TYPE
+ENTITIES_Inventory = arr(ITEMS_Item)
+ENTITIES_SelectedItem = ITEMS_Item
 ENTITIES_TileEntityData = ENTITIES_OBJ
 ENTITIES_Motion = FLOAT_ARRAY_TYPE
 ENTITIES_direction = FLOAT_ARRAY_TYPE
@@ -132,6 +134,8 @@ ENTITIES_HasEgg = INT_TYPE
 ENTITIES_OBJ.content = {
     "Pos": ENTITIES_Pos,
     "UUID": ENTITIES_UUID,
+    "Inventory": ENTITIES_Inventory,
+    "SelectedItem": ENTITIES_SelectedItem,
     "TileEntityData": ENTITIES_TileEntityData,
     "Motion": ENTITIES_Motion,
     "direction": ENTITIES_direction,

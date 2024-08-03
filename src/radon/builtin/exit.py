@@ -1,8 +1,10 @@
+from typing import List
+
 from ..tokenizer import GroupToken
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 
 
-def lib_exit(ctx: TranspilerContext, token: GroupToken):
+def lib_exit(ctx: TranspilerContext, _args: List[GroupToken], token: GroupToken):
     ctx.file.append("return " + token.value[5:-1])
 
 

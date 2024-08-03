@@ -107,10 +107,10 @@ EmptyToken = Token("", TokenType.SYMBOL, 0, 0)
 
 
 class GroupToken(Token):
-    def __init__(self, code: str, start: int, end: int):
+    def __init__(self, code: str, start: int, end: int, children=None):
         super().__init__(code, TokenType.GROUP, start, end)
         self.parent: GroupToken = EmptyGroup
-        self.children: List[Token | GroupToken] = []
+        self.children: List[Token | GroupToken] = children or []
         self.open: Token = EmptyToken
         self.close: Token = EmptyToken
         self.func: Token | None = None

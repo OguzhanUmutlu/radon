@@ -1,7 +1,7 @@
 from typing import Union, Any, List
 
 from ..error import raise_syntax_error, raise_syntax_error_t
-from ..tokenizer import Token
+from ..tokenizer import Token, GroupToken, split_tokens
 from ..utils import CplDef, get_uuid
 
 
@@ -112,6 +112,10 @@ class CompileTimeValue:
         # type: (TranspilerContext, str, List[CompileTimeValue], Token) -> CompileTimeValue | int | None
         return None
 
+    def _raw_call_index(self, ctx, index, arguments, token):
+        # type: (TranspilerContext, str, List[GroupToken], Token) -> CompileTimeValue | int | None
+        return None
+
     def get_index(self, ctx, index, token=None):
         # type: (TranspilerContext, CompileTimeValue, Token | None) -> CompileTimeValue
         st = self.token
@@ -139,7 +143,13 @@ class CompileTimeValue:
         return r
 
     def call_index(self, ctx, index, arguments, token=None):
-        # type: (TranspilerContext, str, List[CompileTimeValue], Token | None) -> CompileTimeValue
+        # type: (TranspilerContext, str, List[CompileTimeValue] | GroupToken, Token | None) -> CompileTimeValue
+        if isinstance(arguments, GroupToken):
+            raw_res = self._raw_call_index(ctx, index, raw_group_args(arguments), arguments)
+            if raw_res is not None:
+                return raw_res
+            arguments = ctx.transpiler.arg_tokens_to_cpl(ctx, arguments.children)
+
         st = self.token
         if not st:
             self.token = token
@@ -321,4 +331,4 @@ from .nbt import CplNBT
 from .int import CplInt
 from .float import CplFloat
 from .score import CplScore
-from ..transpiler import TranspilerContext
+from ..transpiler import TranspilerContext, raw_group_args

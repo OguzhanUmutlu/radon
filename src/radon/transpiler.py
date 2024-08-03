@@ -196,6 +196,15 @@ class TranspilerContext:
         return new
 
 
+def _get_def(v: Any | CplDef):
+    return v if isinstance(v, CplDef) else v.unique_type
+
+
+def raw_group_args(token):
+    return list(
+        map(lambda x: GroupToken(token.code, x[0].start, x[-1].end, x), split_tokens(token.children, ",")))
+
+
 from .cpl._base import CompileTimeValue
 from .cpl.int import CplInt
 from .cpl.float import CplFloat
@@ -207,12 +216,20 @@ from .cpl.score import CplScore
 from .cpl.selector import CplSelector
 from .cpl.nbt import CplNBT, val_nbt
 from .cpl.nbtobject import CplObjectNBT
+from .cpl.nbtarray import CplArrayNBT
 
 
 class CustomCplObject(CplObject):
-    def __init__(self, obj: Dict[str, CompileTimeValue | Any]):
+    def __init__(self, obj: Dict[str, CompileTimeValue | Any] = None, raw_functions: Dict[str, Any] = None):
         super().__init__(None)
-        self.obj = obj
+        self.obj = obj or {}
+        self.raw_functions = raw_functions or {}
+
+    def _raw_call_index(self, ctx, index, arguments, token):
+        if index in self.raw_functions:
+            fn = self.raw_functions[index]
+            return fn(ctx, arguments, token)
+        return None
 
     def _call_index(self, ctx, index, arguments, token):
         if index in self.obj:
@@ -293,9 +310,10 @@ def get_module_attr(module):
 
 
 # add lib
-from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos
+from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, \
+    data
 
-_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos]
+_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, data]
 
 
 def get_fn_macro_obj(ctx: TranspilerContext):
@@ -310,10 +328,6 @@ def get_fn_macro_obj(ctx: TranspilerContext):
     if not has_macro:
         return ""
     return "{" + ",".join(d) + "}"
-
-
-def _get_def(v: CompileTimeValue | CplDef):
-    return v if isinstance(v, CplDef) else v.unique_type
 
 
 class Transpiler:
@@ -987,6 +1001,8 @@ class Transpiler:
                     or cmd[i: i + 5] == "$str("
                     or cmd[i: i + 6] == "$jstr("
                     or cmd[i: i + 6] == "$dstr("
+                    or cmd[i: i + 5] == "$dat("
+                    or cmd[i: i + 5] == "$loc("
             ):
                 si = i
                 k = 0
@@ -1020,7 +1036,7 @@ class Transpiler:
 
                 elif cmd[si + 1] == "s":
                     cmd_str += val.tellraw_object(ctx)
-                elif cmd[si + 1] == "d":
+                elif cmd[si + 1:si + 1] == "ds":
                     py_val = val.get_py_value()
                     if py_val is not None:
                         cmd_str += str(py_val)
@@ -1028,6 +1044,12 @@ class Transpiler:
                         cmd_str += val.tellraw_object(ctx)
                 elif cmd[si + 1] == "j":
                     cmd_str += json.dumps(val.tellraw_object(ctx))
+                elif cmd[si + 1:si + 2] == "da":
+                    cmd_str += val.get_data_str(ctx)
+                elif cmd[si + 1] == "l":
+                    if not isinstance(val, CplScore) and not isinstance(val, CplNBT):
+                        val = val.cache(ctx, force="nbt")
+                    cmd_str += val.location
 
                 i += 1
                 continue
@@ -1186,6 +1208,14 @@ class Transpiler:
                     if len(token.children) == 0:
                         raise_syntax_error("A bracket index has to include an expression inside.", token)
                         assert False
+                    if len(token.children) == 1:
+                        t0 = token.children[0]
+                        if (isinstance(t0, GroupToken)
+                                and t0.open.value == "{"
+                                and isinstance(cpl, CplArrayNBT)):
+                            cpl = val_nbt(t0, cpl.location + token.value, cpl.unique_type.content)
+                            continue
+
                     spl = list(map(lambda x: self.tokens_to_cpl(ctx, x) if len(x) > 0 else None,
                                    split_tokens(token.children, ":", comma_errors=False)))
                     if len(spl) == 1:
@@ -1206,7 +1236,7 @@ class Transpiler:
                     cpl = cpl.get_slice(ctx, spl[0], spl[1], spl[2], token)
                     continue
                 if token.func:
-                    cpl = cpl.call_index(ctx, token.func.value, self.arg_tokens_to_cpl(ctx, token.children), token)
+                    cpl = cpl.call_index(ctx, token.func.value, token, token)
                     continue
                 if token.open.value == "(":
                     cpl = cpl.call(ctx, self.arg_tokens_to_cpl(ctx, token.children), token)
@@ -1286,7 +1316,7 @@ class Transpiler:
                 "auto"
             ))
             return CplString(t, name, is_fn_reference=True)
-        # raise_syntax_error("Invalid expression", t)
+        raise_syntax_error("Unexpected token", t)
         raise ValueError("")
 
     def chains_to_cpl(
@@ -1473,7 +1503,10 @@ class Transpiler:
             if len(built) == 1 and built[0].type == "python-raw":
                 if not base:
                     raise_syntax_error("Cannot run a raw function without tokens", base)
-                return built[0].function(ctx, base) or built[0].returns
+                if not isinstance(base, GroupToken):
+                    raise_syntax_error("Cannot run a raw function without group token", base)
+                    raise ValueError("")
+                return built[0].function(ctx, raw_group_args(base), base) or built[0].returns
             if len(built) == 1 and built[0].type == "python-cpl":
                 return built[0].function(ctx, args, base)
             self.functions.extend(built)
@@ -1589,7 +1622,7 @@ class Transpiler:
         if t.func.value in builtin_fns:
             built = builtin_fns[t.func.value]
             if len(built) == 1 and built[0].type == "python-raw":
-                return built[0].function(ctx, t) or built[0].returns
+                return built[0].function(ctx, raw_group_args(t), t) or built[0].returns
             if len(built) == 1 and built[0].type == "python-cpl":
                 raw_args = built[0].raw_args
 

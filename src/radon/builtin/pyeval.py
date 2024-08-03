@@ -1,9 +1,11 @@
+from typing import List
+
 from ..error import raise_error
 from ..tokenizer import GroupToken
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib, py_to_cpl
 
 
-def lib_eval(_ctx: TranspilerContext, token: GroupToken):
+def lib_eval(_ctx: TranspilerContext, _args: List[GroupToken], token: GroupToken):
     try:
         return py_to_cpl(eval(token.value[7:-1]))
     except Exception as e:
@@ -11,7 +13,7 @@ def lib_eval(_ctx: TranspilerContext, token: GroupToken):
         return None
 
 
-def lib_exec(_ctx: TranspilerContext, token: GroupToken):
+def lib_exec(_ctx: TranspilerContext, _args: List[GroupToken], token: GroupToken):
     try:
         _globals = {"result": 0}
         exec(token.value[7:-1], _globals)
