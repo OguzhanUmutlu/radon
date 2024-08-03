@@ -1,3 +1,4 @@
+import json
 from typing import List
 
 from ..cpl.int import CplInt
@@ -52,7 +53,7 @@ def lib_data_merge(ctx: TranspilerContext, args: List[GroupToken], token: GroupT
             raise_syntax_error(
                 f"Expected a literal object for the first argument of Data.merge() when the merging nbt location is an nbt root",
                 token)
-        ctx.file.append(f"data merge {data_helper(args[0].value)} {args[0].value} ")
+        ctx.file.append(f"data merge {data_helper(args[0].value)} {args[0].value} {json.dumps(py_val)}")
     return expr
 
 
