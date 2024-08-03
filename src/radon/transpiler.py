@@ -345,7 +345,10 @@ class Transpiler:
             self.files = {}
             return
         self.macros = macros
-        load_file = []
+        load_file = [
+            'scoreboard objectives add __temp__ dummy',
+            f'scoreboard objectives set FLOAT_PREC __temp__ {FLOAT_PREC}'
+        ]
         self.files["__load__"] = load_file
         self.load_file = load_file
         main_file = []
@@ -373,20 +376,11 @@ class Transpiler:
 
         # remove the lines after immediate returns
         for file in self.files:
-            if file is self.load_file:
-                continue
             lines = self.files[file]
             if len(lines) == 0:
                 continue
             index = 0
             for index, line in enumerate(lines):
-                if file is not self.load_file:
-                    if "__temp__" in line and "__temp__" not in self.data:
-                        self.data["__temp__"] = True
-                        self.load_file.insert(0, 'scoreboard objectives add __temp__ dummy "__temp__"')
-                    if "FLOAT_PREC __temp__" in line and "float_prec" not in self.data:
-                        self.data["float_prec"] = True
-                        self.load_file.insert(1, f"scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}")
                 if line.startswith("return"):
                     break
             self.files[file] = lines[:index + 1]
