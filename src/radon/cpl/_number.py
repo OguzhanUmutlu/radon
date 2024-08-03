@@ -181,24 +181,18 @@ def nbt_set_pow(self, ctx, cpl):
 
 
 def nbt_add(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(0):
         return self
     return self.cache(ctx, force="score")._set_add(ctx, cpl)
 
 
 def nbt_sub(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(0):
         return self
     return self.cache(ctx, force="score")._set_sub(ctx, cpl)
 
 
 def nbt_mul(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(1):
         return self
     if cpl.is_lit_eq(0):
@@ -207,8 +201,6 @@ def nbt_mul(self, ctx, cpl):
 
 
 def nbt_div(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(0):
         raise_syntax_error("Division by zero", self.token)
     if cpl.is_lit_eq(1):
@@ -217,8 +209,6 @@ def nbt_div(self, ctx, cpl):
 
 
 def nbt_mod(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(0):
         raise_syntax_error("Modulo by zero", self.token)
     if cpl.is_lit_eq(1) and self.unique_type.type == "int":
@@ -227,8 +217,6 @@ def nbt_mod(self, ctx, cpl):
 
 
 def nbt_pow(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     if cpl.is_lit_eq(0):
         return CplInt(self.token, 1)
     if cpl.is_lit_eq(1):
@@ -241,20 +229,14 @@ def nbt_eq_neq(self, ctx, cpl, is_eq):
 
 
 def nbt_cmp(self, ctx, cpl, op):
-    if self.unique_type != cpl.unique_type:
-        return None
     return self.cache(ctx, force="score")._cmp(ctx, cpl, op)
 
 
 def nbt_and(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     return self.cache(ctx, force="score")._and(ctx, cpl)
 
 
 def nbt_or(self, ctx, cpl):
-    if self.unique_type != cpl.unique_type:
-        return None
     return self.cache(ctx, force="score")._or(ctx, cpl)
 
 
