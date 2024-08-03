@@ -276,24 +276,38 @@ class CompileTimeValue:
         return self._mod(other[0], other[1])
 
     def __eq__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return self is other
         return self._eq(other[0], other[1])
 
     def __ne__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return self is not other
         return self._neq(other[0], other[1])
 
     def __gt__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return False
         return self._gt(other[0], other[1])
 
     def __lt__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return False
         return self._lt(other[0], other[1])
 
     def __ge__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return False
         return self._gte(other[0], other[1])
 
     def __le__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return False
         return self._lte(other[0], other[1])
 
     def __and__(self, other):
+        if not isinstance(other, list) or len(other) != 2 or not isinstance(other[1], CompileTimeValue):
+            return False
         return self._and(other[0], other[1])
 
     def __call__(self, *args, **kwargs):

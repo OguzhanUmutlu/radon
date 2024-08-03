@@ -381,7 +381,7 @@ class Transpiler:
                 continue
             index = 0
             for index, line in enumerate(lines):
-                if line.startswith("return"):
+                if line.startswith("return "):
                     break
             self.files[file] = lines[:index + 1]
         if self.debug_mode:
@@ -850,15 +850,13 @@ class Transpiler:
             if ctx.function.returns == "void" and len(expr_tokens) != 0:
                 raise_syntax_error(
                     f"Function cannot return a value because it has a void return type",
-                    statement,
+                    statement
                 )
             if ctx.function.returns != "void":
                 cpl = self.tokens_to_cpl(ctx, expr_tokens)
                 if ctx.function.returns == "auto":
-                    if not isinstance(cpl, CplScore) and not isinstance(cpl, CplNBT):
-                        cpl = cpl.cache(ctx)
-                    ctx.function.returns = cpl
-                elif not isinstance(ctx.function.returns, str):
+                    ctx.function.returns = cpl.cache(ctx)
+                else:
                     if cpl.unique_type != ctx.function.returns.unique_type:
                         raise_syntax_error(
                             f"Function has a return type of {ctx.function.returns.unique_type}, "
