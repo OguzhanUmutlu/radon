@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union
 
 from ._base import CompileTimeValue
 from .nbt import CplNBT
@@ -51,6 +51,12 @@ class CplStringNBT(CplNBT):
             ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{file_name} with storage string_concat")
             return CplStringNBT(self.token, eid)
         return None
+
+    def _and(self, ctx, cpl):
+        return cpl._and(ctx, self.get_index(ctx, CplString(self.token, "length"), self.token))
+
+    def _or(self, ctx, cpl):
+        return cpl._or(ctx, self.get_index(ctx, CplString(self.token, "length"), self.token))
 
 
 from .string import CplString

@@ -61,6 +61,12 @@ class CplString(CplLiteral):
         ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{file_name} with storage string_concat")
         return CplStringNBT(self.token, eid)
 
+    def _and(self, ctx, cpl):
+        return cpl._and(ctx, CplInt(self.token, len(self.value)))
+
+    def _or(self, ctx, cpl):
+        return cpl._or(ctx, CplInt(self.token, len(self.value)))
+
     def tellraw_object(self, ctx):
         return json.dumps(self.value)
 
