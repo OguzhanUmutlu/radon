@@ -347,7 +347,7 @@ class Transpiler:
         self.macros = macros
         load_file = [
             'scoreboard objectives add __temp__ dummy',
-            f'scoreboard objectives set FLOAT_PREC __temp__ {FLOAT_PREC}'
+            f'scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}'
         ]
         self.files["__load__"] = load_file
         self.load_file = load_file
