@@ -35,7 +35,8 @@ def lib_data_append(ctx: TranspilerContext, args: List[GroupToken], token: Group
     if len(args) != 2:
         raise_syntax_error(f"Expected 2 arguments for Data.append()", token)
     expr = ctx.transpiler.tokens_to_cpl(ctx, args[1].children)
-    ctx.file.append(f"data modify {data_helper(args[0].value)} {args[0].value} append {expr.get_data_str(ctx)}")
+    cmd = f"data modify {data_helper(args[0].value)} {args[0].value} append {expr.get_data_str(ctx)}"
+    ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
     return expr
 
 
@@ -46,21 +47,23 @@ def lib_data_merge(ctx: TranspilerContext, args: List[GroupToken], token: GroupT
     if expr.unique_type.type not in {"array", "object", "tuple"}:
         raise_syntax_error(f"Expected a merge-able object for the second argument of Data.merge()", token)
     if " " in args[0].value:
-        ctx.file.append(f"data modify {data_helper(args[0].value)} {args[0].value} merge {expr.get_data_str(ctx)}")
+        cmd = f"data modify {data_helper(args[0].value)} {args[0].value} merge {expr.get_data_str(ctx)}"
     else:
         py_val = expr.get_py_value()
         if py_val is None or not isinstance(expr, CplObject):
             raise_syntax_error(
                 f"Expected a literal object for the first argument of Data.merge() when the merging nbt location is an nbt root",
                 token)
-        ctx.file.append(f"data merge {data_helper(args[0].value)} {args[0].value} {json.dumps(py_val)}")
+        cmd = f"data merge {data_helper(args[0].value)} {args[0].value} {json.dumps(py_val)}"
+    ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
     return expr
 
 
 def lib_data_remove(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
     if len(args) != 1:
         raise_syntax_error(f"Expected 1 argument for Data.remove()", token)
-    ctx.file.append(f"data remove {data_helper(args[0].value)} {args[0].value}")
+    cmd = f"data remove {data_helper(args[0].value)} {args[0].value}"
+    ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
     return CplInt(token, 0)
 
 
