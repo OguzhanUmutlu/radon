@@ -4,7 +4,7 @@ from typing import Union, List
 from ._base import CompileTimeValue
 from ._literal import CplLiteral
 from ..tokenizer import Token
-from ..utils import STRING_TYPE, TokenType, get_expr_id
+from ..utils import STRING_TYPE, TokenType, get_uuid
 
 
 class CplString(CplLiteral):
@@ -54,7 +54,7 @@ class CplString(CplLiteral):
             return CplString(self.token, self.value + cpl.value)
         if not isinstance(cpl, CplStringNBT):
             return None
-        eid = f"storage temp _{get_expr_id()}"
+        eid = f"storage temp _{get_uuid()}"
         file_name = ctx.transpiler.get_temp_file_name(
             f"$data modify {eid} set value '{self.value}$(_0)'")
         cpl.cache(ctx, nbt_loc="string_concat _0", force="nbt")

@@ -11,7 +11,7 @@ def get_float_limit():
 
 _expr_id = 0
 
-VERSION_RADON = "1.5.5"
+VERSION_RADON = "1.5.6"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:
@@ -150,7 +150,7 @@ def reset_expr_id():
     _expr_id = 0
 
 
-def get_expr_id():
+def get_uuid():
     global _expr_id
     _expr_id += 1
     return _expr_id
@@ -330,5 +330,5 @@ str_counter = {}
 def get_str_count(s):
     if s in str_counter:
         return str_counter[s]
-    str_counter[s] = get_expr_id()
+    str_counter[s] = get_uuid()
     return str_counter[s]

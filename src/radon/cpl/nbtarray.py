@@ -5,7 +5,7 @@ from .nbt import CplNBT, object_get_index_nbt, val_nbt
 from .tuple import CplTuple
 from ..error import raise_syntax_error
 from ..tokenizer import Token
-from ..utils import CplDefArray, get_expr_id
+from ..utils import CplDefArray, get_uuid
 
 
 class CplArrayNBT(CplNBT):
@@ -21,7 +21,7 @@ class CplArrayNBT(CplNBT):
 
     def _get_index(self, ctx, index: CompileTimeValue):
         if isinstance(index, CplString) and index.value == "length":
-            eid = f"int_{get_expr_id()} __temp__"
+            eid = f"int_{get_uuid()} __temp__"
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
         if isinstance(index, CplInt) or isinstance(index, CplString):
@@ -37,7 +37,7 @@ class CplArrayNBT(CplNBT):
         if index == "pop":
             if len(arguments) != 0:
                 raise_syntax_error("Expected 0 arguments for <array>.pop()", self.token)
-            eid = f"storage temp _{get_expr_id()}"
+            eid = f"storage temp _{get_uuid()}"
             ctx.file.append(f"data modify {eid} set from {self.location}[-1]")
             ctx.file.append(f"data remove {self.location}[-1]")
             return val_nbt(self.token, eid, self.unique_type.content)

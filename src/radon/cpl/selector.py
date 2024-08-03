@@ -4,7 +4,7 @@ from .string import CplString
 from ..error import raise_syntax_error
 from ..nbt_definitions import ENTITIES_OBJ
 from ..tokenizer import Token
-from ..utils import SELECTOR_TYPE, get_expr_id
+from ..utils import SELECTOR_TYPE, get_uuid
 
 
 class CplSelector(CompileTimeValue):
@@ -36,7 +36,7 @@ class CplSelector(CompileTimeValue):
     def _and(self, ctx, cpl):
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self if cpl.value != 0 else CplInt(self.token, 0)
-        score_loc = f"int_{get_expr_id()} __temp__"
+        score_loc = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {score_loc} 0")
         if isinstance(cpl, CplSelector):
             ctx.file.append(f"execute "
@@ -55,7 +55,7 @@ class CplSelector(CompileTimeValue):
     def _or(self, ctx, cpl):
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self if cpl.value == 0 else CplInt(self.token, 1)
-        score_loc = f"int_{get_expr_id()} __temp__"
+        score_loc = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {score_loc} 0")
         if isinstance(cpl, CplSelector):
             ctx.file.append(f"execute if entity {self.value} run scoreboard players add {score_loc} 1")

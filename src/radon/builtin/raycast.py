@@ -5,7 +5,7 @@ from ..cpl._base import CompileTimeValue
 from ..cpl.score import CplScore
 from ..cpl.string import CplString
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
-from ..utils import get_expr_id
+from ..utils import get_uuid
 
 
 def get_fn_or_none(ctx, arr, index, token):
@@ -59,7 +59,7 @@ def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
             "minecraft:glow_lichen"
         ]
     })
-    raycast_id = get_expr_id()
+    raycast_id = get_uuid()
     iter_eid = f"int_{raycast_id} __temp__"
     success_eid = f"int_raycast_success_{raycast_id} __temp__"
     stop_iter = f"scoreboard players set {iter_eid} -1"

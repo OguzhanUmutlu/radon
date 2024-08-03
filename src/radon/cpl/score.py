@@ -3,7 +3,7 @@ from typing import Union, List
 from ._base import CompileTimeValue
 from ..error import raise_syntax_error
 from ..tokenizer import Token
-from ..utils import INT_TYPE, get_expr_id, FLOAT_PREC, FLOAT_TYPE, inv_cmp
+from ..utils import INT_TYPE, get_uuid, FLOAT_PREC, FLOAT_TYPE, inv_cmp
 
 
 class CplScore(CompileTimeValue):
@@ -28,7 +28,7 @@ class CplScore(CompileTimeValue):
     def as_int(self, ctx, score_loc=None):
         if self.unique_type.type == "int":
             return self
-        eid = score_loc or f"int_{get_expr_id()} __temp__"
+        eid = score_loc or f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players operation {eid} = {self.location}")
         ctx.file.append(f"scoreboard players operation {eid} /= FLOAT_PREC __temp__")
         return CplScore(self.token, eid)
@@ -36,7 +36,7 @@ class CplScore(CompileTimeValue):
     def as_float(self, ctx, score_loc=None):
         if self.unique_type.type == "float":
             return self
-        eid = score_loc or f"float_{get_expr_id()} __temp__"
+        eid = score_loc or f"float_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players operation {eid} = {self.location}")
         ctx.file.append(f"scoreboard players operation {eid} *= FLOAT_PREC __temp__")
         return CplScore(self.token, eid)
@@ -69,7 +69,7 @@ class CplScore(CompileTimeValue):
             ctx.file.append(f"execute store result {nbt_loc} {mul} run scoreboard players get {self.location}")
             return val_nbt(self.token, nbt_loc, force_t or self.unique_type)
         if not score_loc:
-            score_loc = f"{self.unique_type.type}_{get_expr_id()} __temp__"
+            score_loc = f"{self.unique_type.type}_{get_uuid()} __temp__"
         ctx.file.append(
             f"scoreboard players operation {score_loc} = {self.location}"
         )
@@ -185,9 +185,9 @@ class CplScore(CompileTimeValue):
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
             return self._set_div(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
         if isinstance(cpl, CplScore):
-            ctx.file.append(f"scoreboard players operation {self.location} /= {cpl.location}")
             if cpl.unique_type.type == "float":
                 ctx.file.append(f"scoreboard players operation {self.location} *= FLOAT_PREC __temp__")
+            ctx.file.append(f"scoreboard players operation {self.location} /= {cpl.location}")
             return self
         if not isinstance(cpl, CplIntNBT) and not isinstance(cpl, CplFloatNBT):
             return None
@@ -210,6 +210,11 @@ class CplScore(CompileTimeValue):
         if not isinstance(cpl, CplIntNBT) and not isinstance(cpl, CplFloatNBT):
             return None
         return self._set_mod(ctx, cpl.cache(ctx, force="score", force_t=self.unique_type.type))
+
+    def _set_pow(self, ctx, cpl):
+        if cpl.unique_type.type == "float":
+            return None
+        return ctx._set(ctx, ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token))
 
     def _add(self, ctx, cpl):
         if cpl.is_lit_eq(0):
@@ -235,6 +240,11 @@ class CplScore(CompileTimeValue):
             return cpl
         return self.cache(ctx)._set_div(ctx, cpl)
 
+    def _pow(self, ctx, cpl):
+        if cpl.unique_type.type == "float":
+            return None
+        return ctx.transpiler.builtin_vars["Math"].value.call_index(ctx, "ipow", [self, cpl], self.token)
+
     def _mod(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             raise_syntax_error("Modulo by zero", self.token)
@@ -256,7 +266,7 @@ class CplScore(CompileTimeValue):
 
         if isinstance(cpl, CplScore):
             op_if = "unless" if op == "!=" else "if"
-            eid = f"int_{get_expr_id()} __temp__"
+            eid = f"int_{get_uuid()} __temp__"
             t_want = self.unique_type.type
             t_have = cpl.unique_type.type
             if t_want != t_have:
@@ -272,7 +282,7 @@ class CplScore(CompileTimeValue):
     def _and(self, ctx, cpl):
         if isinstance(cpl, CplSelector):
             return cpl._and(ctx, self)
-        eid = f"int_{get_expr_id()} __temp__"
+        eid = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
                         f"unless score {self.location} matches 0..0 "
@@ -283,7 +293,7 @@ class CplScore(CompileTimeValue):
     def _or(self, ctx, cpl):
         if isinstance(cpl, CplSelector):
             return cpl._and(ctx, self)
-        eid = f"int_{get_expr_id()} __temp__"
+        eid = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
                         f"unless score {self.location} matches 0..0 "
@@ -301,7 +311,7 @@ class CplScore(CompileTimeValue):
                     + '","objective":"'
                     + ls[1]
                     + '"}}')
-        eid = get_expr_id()
+        eid = get_uuid()
         ctx.file.append(
             f"execute store result storage temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
         return '{"storage":"temp","nbt":"_' + str(eid) + '"}'

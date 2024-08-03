@@ -8,6 +8,7 @@ from os import path
 from time import sleep, time
 from typing import Any
 
+from src.radon.tokenizer import tokenize
 from .dp_ast import parse_str
 from .transpiler import Transpiler
 from .utils import VERSION_RADON, get_pack_format
@@ -32,6 +33,7 @@ class RadonArgumentParser(ArgumentParser):
         self.add_argument("command", nargs="?", default="build", choices=["build", "watch"],
                           help="The command to run (build or watch)")
         self.add_argument("-d", default=os.getcwd(), type=str, help="sets the working directory")
+        self.add_argument("-b", action="store_true", help="toggles debug mode")
         self.prog = "radon"
 
     def error(self, message):
@@ -111,7 +113,8 @@ def build_dir():
             pack_description=config["description"],
             pack_format=get_pack_format(config["format"]),
             main_dir=config["main"] + "/../",
-            main_file_path=config["main"])
+            main_file_path=config["main"],
+            debug_mode=args.b)
     except SyntaxError as e:
         return str(e)
     except Exception as e:

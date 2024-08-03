@@ -13,7 +13,7 @@ def is_float(s):
         return False
 
 
-OPERATORS = list("+-*/!=%")
+OPERATORS = list("+-/!=%")
 OPERATORS_L = [
     "==",
     "!=",
@@ -24,7 +24,9 @@ OPERATORS_L = [
     "*=",
     "/=",
     "%=",
+    "**=",
     "**",
+    "*",
     "&&",
     "||",
     ">=",
@@ -538,7 +540,8 @@ def _tokenize_iterate(
         tokens.append(Token(code, TokenType.FLOAT_LITERAL, start, index[0] + 1))
         return True
     new_t = Token(code, type, start_index, index[0] + 1)
-    if type == TokenType.IDENTIFIER and len(tokens) > 1 and tokens[-1].value == ":" and tokens[-2].type == TokenType.IDENTIFIER:
+    if type == TokenType.IDENTIFIER and len(tokens) > 1 and tokens[-1].value == ":" and tokens[
+        -2].type == TokenType.IDENTIFIER:
         sep = tokens.pop()
         ident = tokens.pop()
         tokens.append(SelectorIdentifierToken(code, ident.start, index[0] + 1, new_t, sep, ident))

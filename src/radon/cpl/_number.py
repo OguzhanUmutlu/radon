@@ -4,7 +4,7 @@ from .nbtfloat import CplFloatNBT
 from .nbtint import CplIntNBT
 from .score import CplScore
 from ..error import raise_syntax_error
-from ..utils import get_expr_id, basic_cmp, FLOAT_PREC, inv_cmp
+from ..utils import get_uuid, basic_cmp, FLOAT_PREC, inv_cmp
 
 
 def num_add(self, ctx, cpl):
@@ -14,7 +14,7 @@ def num_add(self, ctx, cpl):
         return CplFloat(self.token, self.value + cpl.value)
     if self.value == 0:
         return cpl
-    return self.cache(ctx)._add(ctx, cpl)
+    return self.cache(ctx)._set_add(ctx, cpl)
 
 
 def num_sub(self, ctx, cpl):
@@ -22,7 +22,7 @@ def num_sub(self, ctx, cpl):
         if isinstance(self, CplInt) and isinstance(cpl, CplInt):
             return CplInt(self.token, self.value - cpl.value)
         return CplFloat(self.token, self.value - cpl.value)
-    return self.cache(ctx)._sub(ctx, cpl)
+    return self.cache(ctx)._set_sub(ctx, cpl)
 
 
 def num_mul(self, ctx, cpl):
@@ -34,7 +34,7 @@ def num_mul(self, ctx, cpl):
         return self
     if self.value == 1:
         return cpl
-    return self.cache(ctx)._mul(ctx, cpl)
+    return self.cache(ctx)._set_mul(ctx, cpl)
 
 
 def num_div(self, ctx, cpl):
@@ -44,7 +44,7 @@ def num_div(self, ctx, cpl):
         return CplFloat(self.token, self.value / cpl.value)
     if self.value == 0:
         raise_syntax_error("Division by zero", self.token)
-    return self.cache(ctx)._div(ctx, cpl)
+    return self.cache(ctx)._set_div(ctx, cpl)
 
 
 def num_mod(self, ctx, cpl):
@@ -54,7 +54,15 @@ def num_mod(self, ctx, cpl):
         return CplFloat(self.token, self.value % cpl.value)
     if self.value == 0:
         raise_syntax_error("Modulo by zero", self.token)
-    return self.cache(ctx)._mod(ctx, cpl)
+    return self.cache(ctx)._set_mod(ctx, cpl)
+
+
+def num_pow(self, ctx, cpl):
+    if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):
+        if isinstance(self, CplInt):
+            return CplInt(self.token, self.value ** cpl.value)
+        return CplFloat(self.token, self.value ** cpl.value)
+    return self.cache(ctx)._set_pow(ctx, cpl)
 
 
 def num_eq_neq(self, ctx, cpl, is_eq):
@@ -75,7 +83,7 @@ def num_eq_neq(self, ctx, cpl, is_eq):
             v = int(v)
         if score_t == "float":
             v = int(v * FLOAT_PREC)
-        eid = f"int_{get_expr_id()} __temp__"
+        eid = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute if score {cpl.location} matches {v}..{v} "
                         f"run scoreboard players set {eid} 1")
@@ -99,7 +107,7 @@ def num_cmp(self, ctx, cpl, op):
         v = int(v)
     if score_t == "float":
         v = int(v * FLOAT_PREC)
-    eid = f"int_{get_expr_id()} __temp__"
+    eid = f"int_{get_uuid()} __temp__"
     ctx.file.append(f"scoreboard players set {eid} 0")
     matcher = ""
     if inv_op == ">":
@@ -165,12 +173,19 @@ def nbt_set_mod(self, ctx, cpl):
     return self
 
 
+def nbt_set_pow(self, ctx, cpl):
+    if cpl.is_lit_eq(0):
+        return CplInt(self.token, 1)
+    nbt_pow(self, ctx, cpl).cache(ctx, nbt_loc=self.location, force="nbt")
+    return self
+
+
 def nbt_add(self, ctx, cpl):
     if self.unique_type != cpl.unique_type:
         return None
     if cpl.is_lit_eq(0):
         return self
-    return self.cache(ctx, force="score")._add(ctx, cpl)
+    return self.cache(ctx, force="score")._set_add(ctx, cpl)
 
 
 def nbt_sub(self, ctx, cpl):
@@ -178,7 +193,7 @@ def nbt_sub(self, ctx, cpl):
         return None
     if cpl.is_lit_eq(0):
         return self
-    return self.cache(ctx, force="score")._sub(ctx, cpl)
+    return self.cache(ctx, force="score")._set_sub(ctx, cpl)
 
 
 def nbt_mul(self, ctx, cpl):
@@ -188,7 +203,7 @@ def nbt_mul(self, ctx, cpl):
         return self
     if cpl.is_lit_eq(0):
         return cpl
-    return self.cache(ctx, force="score")._mul(ctx, cpl)
+    return self.cache(ctx, force="score")._set_mul(ctx, cpl)
 
 
 def nbt_div(self, ctx, cpl):
@@ -198,7 +213,7 @@ def nbt_div(self, ctx, cpl):
         raise_syntax_error("Division by zero", self.token)
     if cpl.is_lit_eq(1):
         return self
-    return self.cache(ctx, force="score")._div(ctx, cpl)
+    return self.cache(ctx, force="score")._set_div(ctx, cpl)
 
 
 def nbt_mod(self, ctx, cpl):
@@ -208,7 +223,17 @@ def nbt_mod(self, ctx, cpl):
         raise_syntax_error("Modulo by zero", self.token)
     if cpl.is_lit_eq(1) and self.unique_type.type == "int":
         return self
-    return self.cache(ctx, force="score")._mod(ctx, cpl)
+    return self.cache(ctx, force="score")._set_mod(ctx, cpl)
+
+
+def nbt_pow(self, ctx, cpl):
+    if self.unique_type != cpl.unique_type:
+        return None
+    if cpl.is_lit_eq(0):
+        return CplInt(self.token, 1)
+    if cpl.is_lit_eq(1):
+        return self
+    return self.cache(ctx, force="score")._set_pow(ctx, cpl)
 
 
 def nbt_eq_neq(self, ctx, cpl, is_eq):
@@ -239,6 +264,7 @@ def make_num(cpl):
     cpl._mul = num_mul
     cpl._div = num_div
     cpl._mod = num_mod
+    cpl._pow = num_pow
     cpl._eq_neq = num_eq_neq
     cpl._cmp = num_cmp
     cpl._and = num_and
@@ -251,11 +277,13 @@ def make_nbt_num(cpl):
     cpl._set_mul = nbt_set_mul
     cpl._set_div = nbt_set_div
     cpl._set_mod = nbt_set_mod
+    cpl._set_pow = nbt_set_pow
     cpl._add = nbt_add
     cpl._sub = nbt_sub
     cpl._mul = nbt_mul
     cpl._div = nbt_div
     cpl._mod = nbt_mod
+    cpl._pow = nbt_pow
     cpl._eq_neq = nbt_eq_neq
     cpl._cmp = nbt_cmp
     cpl._and = nbt_and

@@ -46,7 +46,7 @@ from .utils import (
     CplDef,
     VariableDeclaration,
     TokenType,
-    get_expr_id,
+    get_uuid,
     INT_LIMIT,
     CplDefArray, reset_expr_id, FLOAT_PREC, CplDefFunction, get_float_limit
 )
@@ -152,7 +152,7 @@ class ClassDeclaration:
             methods: List[FunctionDeclaration],
             sample  # type: CplObjectNBT
     ):
-        self.id = get_expr_id()
+        self.id = get_uuid()
         self.name = name
         self.attributes = attributes
         self.methods = methods
@@ -177,6 +177,23 @@ class TranspilerContext:
         self.function = function
         self.loop = loop
         self.class_name = class_name
+
+    def clone(self):
+        return TranspilerContext(
+            self.transpiler,
+            self.file_name,
+            self.file,
+            self.radon_path,
+            self.function,
+            self.loop,
+            self.class_name
+        )
+
+    def clone_at(self, file_name: str):
+        new = self.clone()
+        new.file_name = file_name
+        new.file = self.transpiler.files[file_name]
+        return new
 
 
 from .cpl._base import CompileTimeValue
@@ -302,7 +319,7 @@ def _get_def(v: CompileTimeValue | CplDef):
 class Transpiler:
     def __init__(self, statements: List[Statement], macros: List[Statement], pack_namespace: str = "mypack",
                  pack_description: str = "", pack_format: int = 48, main_dir: str = "./",
-                 main_file_path: str = "main.rn") -> None:
+                 main_file_path: str = "main.rn", debug_mode=False) -> None:
         reset_expr_id()
         self.files = dict()
         self.dp_files = dict()
@@ -322,6 +339,7 @@ class Transpiler:
         self.builtin_fns = builtin_fns
         self.builtin_vars = builtin_vars
         self.s = "" if self.pack_format >= 48 else "s"
+        self.debug_mode = debug_mode
 
         if len(statements) == 0:
             self.files = {}
@@ -355,7 +373,7 @@ class Transpiler:
 
         # remove the lines after immediate returns
         for file in self.files:
-            if file == "__load__":
+            if file is self.load_file:
                 continue
             lines = self.files[file]
             if len(lines) == 0:
@@ -371,7 +389,18 @@ class Transpiler:
                         self.load_file.insert(1, f"scoreboard players set FLOAT_PREC __temp__ {FLOAT_PREC}")
                 if line.startswith("return"):
                     break
-            self.files[file] = lines[: index + 1]
+            self.files[file] = lines[:index + 1]
+        if self.debug_mode:
+            for file in self.files:
+                lines = self.files[file]
+                new_file = []
+                for line in lines:
+                    new_file.append(line)
+                    if line.startswith("scoreboard players "):
+                        spl = line.split(" ")
+                        new_file.append('tellraw @a ["' + spl[3] + " " + spl[4] + ' = ",{"score":{"name":"' + spl[
+                            3] + '","objective":"' + spl[4] + '"}}]')
+                self.files[file] = new_file
 
     def get_datapack_files(self):
         fn_folder = "function" + self.s
@@ -402,7 +431,7 @@ class Transpiler:
             content = "\n".join(content)
         if content in self.tempFiles:
             return self.tempFiles[content]
-        file_name = f"__temp__/{get_expr_id()}"
+        file_name = f"__temp__/{get_uuid()}"
         self.tempFiles[content] = file_name
         self.files[file_name] = content.split("\n")
         return file_name
@@ -562,7 +591,7 @@ class Transpiler:
                     raise_syntax_error("File not found", statement)
                 content = open(pt, "r", encoding="utf-8").read()
                 os.chdir(bef)
-                fn_id = get_expr_id()
+                fn_id = get_uuid()
                 self.files[f"__imported__/{fn_id}"] = content.split("\n")
                 self.functions.append(FunctionDeclaration(
                     type="mcfunction-imported",
@@ -713,6 +742,8 @@ class Transpiler:
                     return True
                 if len(ctx.file) > 0 and ctx.file[-1].startswith(cl2):
                     ctx.file[-1] = ctx.file[-1][len(cl2):]
+                if len(ctx.file) > 1 and ret.location not in ctx.file[-1] and ctx.file[-2].startswith(cl1):
+                    ctx.file.pop(-2)
             if isinstance(ret, CplNBT) and ret.location.startswith("storage temp "):
                 # Cleaning the return results of the inline expression since they aren't going to be used
                 cl1 = f"data modify {ret.location} set from"
@@ -866,7 +897,7 @@ class Transpiler:
             exec_name = self._run_safe("__execute__", statement.body, ctx)
             cmd_str, has_repl = self.proc_cmd(ctx, statement.command)
             if has_repl:
-                fid = f"__execute__/{get_expr_id()}"
+                fid = f"__execute__/{get_uuid()}"
                 self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}"]
                 ctx.file.append(f"function {self.pack_namespace}:{fid} with storage cmd_mem")
             else:
@@ -880,7 +911,7 @@ class Transpiler:
             self._transpile_statement(ctx, statement)
 
     def _run_safe(self, folder_name, statements, ctx: TranspilerContext):
-        eid = get_expr_id()
+        eid = get_uuid()
         file_name = f"{folder_name}/{eid}"
         new_file = []
         loop = ctx.loop
@@ -1018,8 +1049,7 @@ class Transpiler:
         cmd = pointer.value
         cmd_str, has_repl = self.proc_cmd(ctx, cmd)
 
-        eid = score_loc or "int_" + str(
-            get_expr_id()) + " __temp__"  # TODO: Does it have to be an int? Can I allow floats?
+        eid = score_loc or "int_" + str(get_uuid()) + " __temp__"
         eid_val = CplScore(pointer, eid, "int")
 
         if not has_repl:
@@ -1033,7 +1063,7 @@ class Transpiler:
                 file_name = i
                 break'''
         if file_name is None:
-            cmd_id = get_expr_id()
+            cmd_id = get_uuid()
             file_name = f"__cmd__/{cmd_id}"
         self.files[file_name] = cmd_file
         cmd_file.append("$" + cmd_str)
@@ -1253,7 +1283,7 @@ class Transpiler:
 
             return CplObject(t, d, class_name=None)
         if isinstance(t, LambdaFunctionToken):
-            name = f"__lambda__/{get_expr_id()}"
+            name = f"__lambda__/{get_uuid()}"
             self._transpile_statement(ctx, DefineFunctionStatement(
                 t.code,
                 t.start,
@@ -1287,7 +1317,7 @@ class Transpiler:
             if isinstance(variable_cpl, CplInt) or isinstance(variable_cpl, CplFloat):
                 return CplInt(t1[0], 1 - variable_cpl.value)
 
-            temp_score = CplScore(t1[0], f"int_{get_expr_id()}")
+            temp_score = CplScore(t1[0], f"int_{get_uuid()}")
             temp_score.compute(ctx, "=", CplInt(None, 1), t1[0])
             variable_cpl.compute(ctx, "-=", temp_score, t1[0])
 
@@ -1502,7 +1532,7 @@ class Transpiler:
                 store_at._set(ctx, val)
 
         if found_fn.type == "mcfunction-imported":
-            eid = f"int_{get_expr_id()} __temp__"
+            eid = f"int_{get_uuid()} __temp__"
             ctx.file.append(
                 f"execute store result score {eid} run function {self.pack_namespace}:{found_fn.file_name} with storage fn_mem")
             return CplScore(base, eid)

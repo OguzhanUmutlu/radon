@@ -2,7 +2,7 @@ from typing import Union, Any, List
 
 from ..error import raise_syntax_error, raise_syntax_error_t
 from ..tokenizer import Token
-from ..utils import CplDef, get_expr_id
+from ..utils import CplDef, get_uuid
 
 
 class CompileTimeValue:
@@ -52,6 +52,8 @@ class CompileTimeValue:
             res = self._div(ctx, cpl)
         elif op == "%":
             res = self._mod(ctx, cpl)
+        elif op == "**":
+            res = self._pow(ctx, cpl)
         elif op == "+=":
             res = self._set_add(ctx, cpl)
         elif op == "-=":
@@ -62,6 +64,8 @@ class CompileTimeValue:
             res = self._set_div(ctx, cpl)
         elif op == "%=":
             res = self._set_mod(ctx, cpl)
+        elif op == "**=":
+            res = self._set_pow(ctx, cpl)
         elif op == "=":
             res = self._set(ctx, cpl)
         elif op == "==" or op == "is":
@@ -89,11 +93,11 @@ class CompileTimeValue:
         # type: (TranspilerContext, str | None, str | None, str | None, str | None) -> Union[CplScore, CplNBT]
         nbt_got_id = None
         if not nbt_loc and force != "score":
-            nbt_got_id = get_expr_id()
+            nbt_got_id = get_uuid()
             nbt_loc = f"storage temp _{nbt_got_id}"
         if not score_loc and force != "nbt":
             t = self.unique_type if force_t is None else force_t
-            score_loc = f"{t}_{nbt_got_id or get_expr_id()} __temp__"
+            score_loc = f"{t}_{nbt_got_id or get_uuid()} __temp__"
         return self._cache(ctx, score_loc, nbt_loc, force, force_t)
 
     def _get_index(self, ctx, index):
@@ -180,6 +184,9 @@ class CompileTimeValue:
         return None
 
     def _set_mod(self, ctx, cpl):
+        return None
+
+    def _set_pow(self, ctx, cpl):
         return None
 
     def _add(self, ctx, cpl):

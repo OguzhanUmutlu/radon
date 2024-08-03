@@ -6,7 +6,7 @@ from ..cpl.int import CplInt
 from ..cpl.object import CplObject
 from ..error import raise_syntax_error
 from ..transpiler import add_lib, TranspilerContext
-from ..utils import VariableDeclaration, get_expr_id
+from ..utils import VariableDeclaration, get_uuid
 
 
 class RecipeObject(CplObject):
@@ -21,7 +21,7 @@ class RecipeObject(CplObject):
             recipe = recipe.get_py_value()
             if not recipe:
                 raise_syntax_error("Expected the table to be a literal object", token)
-            tr.dp_files[f"recipe{tr.s}/recipe_{get_expr_id()}.json"] = json.dumps(recipe, indent=2)
+            tr.dp_files[f"recipe{tr.s}/recipe_{get_uuid()}.json"] = json.dumps(recipe, indent=2)
             return CplInt(token, 0)
         return None
 

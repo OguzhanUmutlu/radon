@@ -4,7 +4,7 @@ from ._base import CompileTimeValue
 from .nbt import CplNBT
 from .score import CplScore
 from ..tokenizer import Token
-from ..utils import STRING_TYPE, get_expr_id
+from ..utils import STRING_TYPE, get_uuid
 
 
 class CplStringNBT(CplNBT):
@@ -13,7 +13,7 @@ class CplStringNBT(CplNBT):
 
     def _get_index(self, ctx, index: CompileTimeValue):
         if isinstance(index, CplString) and index.value == "length":
-            eid = f"int_{get_expr_id()} __temp__"
+            eid = f"int_{get_uuid()} __temp__"
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
         return None
@@ -36,14 +36,14 @@ class CplStringNBT(CplNBT):
 
     def _add(self, ctx, cpl):
         if isinstance(cpl, CplString):
-            eid = f"storage temp _{get_expr_id()}"
+            eid = f"storage temp _{get_uuid()}"
             file_name = ctx.transpiler.get_temp_file_name(
                 f"$data modify {eid} set value '$(_0){cpl.value}'")
             self.cache(ctx, nbt_loc="string_concat _0", force="nbt")
             ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{file_name} with storage string_concat")
             return CplStringNBT(self.token, eid)
         if not isinstance(cpl, CplStringNBT):
-            eid = f"storage temp _{get_expr_id()}"
+            eid = f"storage temp _{get_uuid()}"
             file_name = ctx.transpiler.get_temp_file_name(
                 f"$data modify {eid} set value '$(_0)$(_1)'")
             self.cache(ctx, nbt_loc="string_concat _0", force="nbt")

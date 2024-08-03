@@ -5,7 +5,7 @@ from ..cpl.int import CplInt
 from ..cpl.string import CplString
 from ..error import raise_syntax_error
 from ..transpiler import add_lib, CustomCplObject
-from ..utils import VariableDeclaration, CplDefFunction, STRING_TYPE, get_str_count, get_expr_id
+from ..utils import VariableDeclaration, CplDefFunction, STRING_TYPE, get_str_count, get_uuid
 
 funcArgs = [CplDefFunction([], None)]  # (() => void)
 
@@ -113,7 +113,7 @@ def listener_on(ctx, arguments, token):
 
     arg1_fn = tr.get_fn(arg1.value, [], token)
 
-    eid = get_expr_id()
+    eid = get_uuid()
 
     tr.files[file_name].append(
         f"execute if score __event__{event_str}_{eid} __temp__ matches 1..1 run function {tr.pack_namespace}:{arg1_fn.file_name}")

@@ -2,7 +2,7 @@ from typing import Union
 
 from ._base import CompileTimeValue
 from ..tokenizer import Token
-from ..utils import get_expr_id, CplDef, CplDefObject, CplDefArray
+from ..utils import get_uuid, CplDef, CplDefObject, CplDefArray
 
 
 class CplNBT(CompileTimeValue):
@@ -15,7 +15,7 @@ class CplNBT(CompileTimeValue):
         if force == "score":
             return None
         if not nbt_loc:
-            nbt_loc = f"storage temp _{get_expr_id()}"
+            nbt_loc = f"storage temp _{get_uuid()}"
         ctx.file.append(f"data modify {nbt_loc} set from {self.location}")
         return val_nbt(self.token, nbt_loc, self.unique_type)
 
@@ -58,7 +58,7 @@ def val_nbt(
 
 
 def object_get_index_nbt(ctx, content_type, cpl, index):
-    eid = f"storage object_index _{get_expr_id()}"
+    eid = f"storage object_index _{get_uuid()}"
     file_name = ctx.transpiler.get_temp_file_name("$data modify {eid} set from $(_0).$(_1)")
 
     cpl.cache(ctx, force="nbt", nbt_loc="object_get_index _0")

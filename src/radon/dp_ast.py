@@ -219,7 +219,7 @@ EXPR_EXPR = [
     TokenType.LAMBDA_FUNCTION
 ]
 
-EXPR_OP = list("+-*/%")
+EXPR_OP = list("+-*/%") + ["**"]
 
 
 def is_time(token: Token):

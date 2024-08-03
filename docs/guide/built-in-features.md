@@ -103,45 +103,30 @@ as @p positioned 10 5 4 facing 8 5 2 {
 }
 ```
 
-## Math.sqrt(int | float): float
+## Math
 
-Returns the square root of an int or float.
-
-## Math.isqrt(int | float): int
-
-Returns the integer square root of an int or float.
-
-## Math.cbrt(int | float): float
-
-Returns the cubic root of an int or float.
-
-## Math.floor(int | float): int
-
-Returns the floor of an int or float.
-
-## Math.ceil(int | float): int
-
-Returns the ceiling of an int or float.
-
-## Math.round(int | float): int
-
-Returns the round of an int or float.
-
-## Math.min(...(int | float)): int | float
-
-Returns the minimum of multiple ints or floats.
-
-Return type is float if one of the arguments is a float, otherwise it is int.
-
-## Math.max(...(int | float)): int | float
-
-Returns the maximum of multiple ints or floats.
-
-Return type is float if one of the arguments is a float, otherwise it is int.
-
-## Math.random(int min=1, int max=2147483647): int
-
-Returns a random int in the range [min, max].
+- Math.sqrt(int | float): float
+- Math.isqrt(int | float): int
+- Math.cbrt(int | float): float
+- Math.exp(int | float): float
+- Math.fastexp(int | float): float
+- Math.ipow(int | float, int): int | float
+- Math.sin(int | float): float
+- Math.cos(int | float): float
+- Math.tan(int | float): float
+- Math.arcsin(int | float): float
+- Math.arccos(int | float): float
+- Math.arctan(int | float): float
+- Math.fastarcsin(int | float): float
+- Math.fastarccos(int | float): float
+- Math.fastarctan(int | float): float
+- Math.floor(int | float): int
+- Math.ceil(int | float): int
+- Math.round(int | float): int
+- Math.min(...(int | float)): int | float
+- Math.max(...(int | float)): int | float
+- Math.random(int min=1, int max=2147483647): int
+- Math.frandom(int min=1, int max=2147483647): float
 
 ## Recipe.add(object)
 
