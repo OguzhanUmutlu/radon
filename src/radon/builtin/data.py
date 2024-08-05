@@ -111,6 +111,13 @@ def lib_mstr(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
     return CplStringNBT(token, nbt_loc)
 
 
+def lib_run_cmd(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
+    if len(args) != 1:
+        raise_syntax_error(f"Expected 1 argument for run_cmd()", token)
+    cmd = args[0].value
+    return ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
+
+
 add_lib(VariableDeclaration(
     name="Data",
     type=CustomCplObject({}, {
@@ -133,4 +140,8 @@ add_lib(VariableDeclaration(
     name="mstr",
     type="python-raw",
     function=lib_mstr
+), FunctionDeclaration(
+    name="runCommand",
+    type="python-raw",
+    function=lib_run_cmd
 ))

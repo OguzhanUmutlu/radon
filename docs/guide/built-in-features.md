@@ -573,3 +573,19 @@ result = mstr(b is: $(b), c is: $(c), d is: $(d))
 ```
 
 </details>
+
+## runCommand(macro)
+
+<details>
+<summary>Click to view</summary>
+
+Runs the command using macros. This is only useful if the command itself is a macro.
+
+Examples:
+
+```js
+myCommand = "say "
+runCommand($(myCommand) Hello, world!)
+```
+
+</details>

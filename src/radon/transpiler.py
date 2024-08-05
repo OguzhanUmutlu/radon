@@ -134,6 +134,7 @@ class FunctionDeclaration:
             arguments = []
         if raw_args is None:
             raw_args = []
+        self.id = get_uuid()
         self.type = type
         self.name = name
         self.file_name = file_name
@@ -855,7 +856,7 @@ class Transpiler:
             for index, arg in enumerate(arguments):
                 if arg.store_via == "macro":
                     t = arg.store.unique_type.content  # type: CplDef
-                    macro = f"$({arg.store.location.split(' ')[-1]})"
+                    macro = f"$({arg.name})"
                     if t.type == "string":
                         macro = f'"{macro}"'
                     fn_file.append(f"$data modify {arg.store.location} append value {macro}")
@@ -929,11 +930,15 @@ class Transpiler:
             if has_repl:
                 fid = f"__execute__/{get_uuid()}"
                 self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}"]
+                for arg in ctx.function.arguments:
+                    if arg.store_via == "macro":
+                        ctx.file.append("data modify temp _cmd_mem set value {}")
+                        break
                 if mac:
                     for arg in ctx.function.arguments:
                         if arg.store_via == "macro":
-                            ctx.file.append(f"$data modify storage cmd_mem {arg.name} set value '$({arg.name})'")
-                ctx.file.append(f"function {self.pack_namespace}:{fid} with storage cmd_mem")
+                            ctx.file.append(f"$data modify storage temp _cmd_mem.{arg.name} set value '$({arg.name})'")
+                ctx.file.append(f"function {self.pack_namespace}:{fid} with storage temp _cmd_mem")
             else:
                 ctx.file.append(
                     f"{'$' if mac else ''}execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}")
@@ -1015,7 +1020,7 @@ class Transpiler:
                         arg[0][0],
                         CplDefArray(arg_type_parsed) if store_via in {"stack", "macro"} else arg_type_parsed,
                         score_loc="",
-                        nbt_loc=f"storage fn_args {arg_name}",
+                        nbt_loc=f"storage temp _fn_args.{get_uuid()}",
                         force_nbt=True
                     ),
                     store_via=store_via
@@ -1029,6 +1034,7 @@ class Transpiler:
         has_repl = False
         repl_i = 0
         cmd = " ".join(s[:-1] if s[-1] == "\\" else s for s in cmd.strip().split("\n"))
+        before_index = len(ctx.file)
         while i < len(cmd):
             if cmd[i: i + 3] == "\\$(":
                 if self.pack_format < 18:
@@ -1079,7 +1085,7 @@ class Transpiler:
                 if cmd[si + 1] == "(":
                     cmd_str += f"$(_{repl_i})"
                     val.cache(
-                        ctx, nbt_loc=f"storage cmd_mem _{repl_i}", force="nbt"
+                        ctx, nbt_loc=f"storage temp _cmd_mem._{repl_i}", force="nbt"
                     )
 
                     has_repl = True
@@ -1106,6 +1112,8 @@ class Transpiler:
                 continue
             cmd_str += cmd[i]
             i += 1
+        if has_repl:
+            ctx.file.insert(before_index, "data modify storage temp _cmd_mem set value {}")
 
         return cmd_str, has_repl
 
@@ -1133,7 +1141,7 @@ class Transpiler:
         self.files[file_name] = cmd_file
         cmd_file.append("$return run " + cmd_str)
         file.append(
-            f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage cmd_mem"
+            f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage temp _cmd_mem"
         )
         return eid_val
 
@@ -1600,6 +1608,7 @@ class Transpiler:
             return found_fn.function(ctx, args, base)
 
         has_any_macro_argument = False
+        index_left = len(ctx.file)
 
         for index, arg in enumerate(fn_args):
             store_at = arg.store
@@ -1612,7 +1621,7 @@ class Transpiler:
                 else:
                     ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
             elif arg.store_via == "macro":
-                val.cache(ctx, nbt_loc=f"storage fn_args_macro {arg.store.location.split(' ')[-1]}", force="nbt")
+                val.cache(ctx, nbt_loc=f"storage temp _fn_args_macro.{found_fn.id}.{arg.name}", force="nbt")
                 has_any_macro_argument = True
             else:
                 store_at._set(ctx, val)
@@ -1630,7 +1639,7 @@ class Transpiler:
 
         if found_fn.type == "radon":
             ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
-                f" with storage fn_args_macro" if has_any_macro_argument else ""
+                f" with storage temp _fn_args_macro {found_fn.id}" if has_any_macro_argument else ""
             ))
             for index, arg in enumerate(fn_args):
                 if arg.store_via == "stack":
