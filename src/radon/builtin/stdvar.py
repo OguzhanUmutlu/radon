@@ -1,4 +1,4 @@
-from ..cpl.int import CplInt
+from ..cpl import CplInt
 from ..transpiler import add_lib
 from ..utils import VariableDeclaration
 

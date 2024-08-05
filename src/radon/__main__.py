@@ -25,7 +25,7 @@ RESET = "\x1b[0m"
 GRAY = "\x1b[90m"
 
 
-# Usage: radon [build|watch] (-d="cwd")
+# Usage: radon [build|watch|version] (-d="cwd") (-b)
 
 class RadonArgumentParser(ArgumentParser):
     def __init__(self):

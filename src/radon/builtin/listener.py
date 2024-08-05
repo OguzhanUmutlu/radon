@@ -1,8 +1,7 @@
 import json
 import re
 
-from ..cpl.int import CplInt
-from ..cpl.string import CplString
+from ..cpl import CplInt, CplString
 from ..error import raise_syntax_error
 from ..transpiler import add_lib, CustomCplObject
 from ..utils import VariableDeclaration, CplDefFunction, STRING_TYPE, get_str_count, get_uuid

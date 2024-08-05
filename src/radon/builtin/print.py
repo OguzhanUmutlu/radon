@@ -1,15 +1,12 @@
 from typing import List
 
-from ..cpl.string import CplString
+from ..cpl import CplString, Cpl, CplInt, CplSelector
 from ..utils import VariableDeclaration
-from ..cpl._base import CompileTimeValue
-from ..cpl.int import CplInt
-from ..cpl.selector import CplSelector
 from ..error import raise_syntax_error
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib, CustomCplObject
 
 
-def _lib_print(ctx: TranspilerContext, args: List[CompileTimeValue], token, prefix: str, name: str):
+def _lib_print(ctx: TranspilerContext, args: List[Cpl], token, prefix: str, name: str):
     if len(args) < 1:
         raise_syntax_error(f"Invalid arguments. Expected usage: {name}(selector, ...anything)", token)
     if not isinstance(args[0], CplSelector):
@@ -22,24 +19,24 @@ def _lib_print(ctx: TranspilerContext, args: List[CompileTimeValue], token, pref
     return CplInt(token, 0)
 
 
-def lib_print(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_print(ctx: TranspilerContext, args: List[Cpl], token):
     return _lib_print(ctx, args, token, "tellraw @", "print")
 
 
-def lib_print_title(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_print_title(ctx: TranspilerContext, args: List[Cpl], token):
     return _lib_print(ctx, args, token, "title @ title", "printTitle")
 
 
-def lib_print_subtitle(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_print_subtitle(ctx: TranspilerContext, args: List[Cpl], token):
     return _lib_print(ctx, args, token, "title @ subtitle", "printSubtitle")
 
 
-def lib_print_actionbar(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_print_actionbar(ctx: TranspilerContext, args: List[Cpl], token):
     return _lib_print(ctx, args, token, "title @ actionbar", "printActionbar")
 
 
-class CplFormat(CompileTimeValue):
-    def __init__(self, token, fmt, value: CompileTimeValue):
+class CplFormat(Cpl):
+    def __init__(self, token, fmt, value: Cpl):
         super().__init__(token)
         self.fmt = fmt
         self.value = value

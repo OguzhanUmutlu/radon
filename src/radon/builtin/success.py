@@ -1,6 +1,6 @@
 from typing import List
 
-from ..cpl.score import CplScore
+from ..cpl import CplScore
 from ..tokenizer import GroupToken, Token
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import TokenType

@@ -1,19 +1,13 @@
 import math
 from typing import List, Any
 
-from ..cpl._base import CompileTimeValue
-from ..cpl.float import CplFloat
-from ..cpl.int import CplInt
-from ..cpl.nbt import CplNBT
-from ..cpl.nbtfloat import CplFloatNBT
-from ..cpl.nbtint import CplIntNBT
-from ..cpl.score import CplScore
+from ..cpl import Cpl, CplFloat, CplInt, CplNBT, CplFloatNBT, CplIntNBT, CplScore
 from ..error import raise_syntax_error
 from ..transpiler import TranspilerContext, add_lib, CustomCplObject
 from ..utils import FLOAT_PREC, VariableDeclaration, get_uuid
 
 
-def helper_float0_check(ctx: TranspilerContext, args: List[CompileTimeValue], token, method: str):
+def helper_float0_check(ctx: TranspilerContext, args: List[Cpl], token, method: str):
     if len(args) != 1:
         raise_syntax_error(f"Expected 1 argument for {method}()", token)
     n = args[0]
@@ -21,7 +15,7 @@ def helper_float0_check(ctx: TranspilerContext, args: List[CompileTimeValue], to
         raise_syntax_error(f"Expected an int or float argument for {method}()", token)
 
 
-def helper_float0(ctx: TranspilerContext, args: List[CompileTimeValue], token, method: str,
+def helper_float0(ctx: TranspilerContext, args: List[Cpl], token, method: str,
                   score_loc=None) -> float | CplScore:
     helper_float0_check(ctx, args, token, method)
     n = args[0]
@@ -30,7 +24,7 @@ def helper_float0(ctx: TranspilerContext, args: List[CompileTimeValue], token, m
     return n.cache(ctx, score_loc=score_loc, force="score", force_t="float")
 
 
-def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_sqrt(ctx: TranspilerContext, args: List[Cpl], token):
     tr = ctx.transpiler
     helper = helper_float0(ctx, args, token, "Math.sqrt", "__sqrt__x __temp__")
     if isinstance(helper, float):
@@ -79,7 +73,7 @@ def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__sqrt__output __temp__", "float")
 
 
-def lib_isqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_isqrt(ctx: TranspilerContext, args: List[Cpl], token):
     if len(args) != 1:
         raise_syntax_error("Expected 1 argument for Math.isqrt()", token)
     n = args[0]
@@ -117,7 +111,7 @@ def lib_isqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__isqrt__output __temp__", "int")
 
 
-def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_cbrt(ctx: TranspilerContext, args: List[Cpl], token):
     tr = ctx.transpiler
     helper = helper_float0(ctx, args, token, "Math.cbrt", "__cbrt__x __temp__")
     if isinstance(helper, float):
@@ -156,14 +150,14 @@ def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__cbrt__output __temp__", "float")
 
 
-def lib_floor(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_floor(ctx: TranspilerContext, args: List[Cpl], token):
     helper = helper_float0(ctx, args, token, "Math.floor")
     if isinstance(helper, float):
         return CplFloat(token, math.floor(helper))
     return helper
 
 
-def lib_ceil(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_ceil(ctx: TranspilerContext, args: List[Cpl], token):
     helper = helper_float0(ctx, args, token, "Math.ceil", "__ceil__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, math.ceil(helper))
@@ -176,7 +170,7 @@ def lib_ceil(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return helper
 
 
-def lib_round(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_round(ctx: TranspilerContext, args: List[Cpl], token):
     helper = helper_float0(ctx, args, token, "Math.round", "__round__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, round(helper))
@@ -194,7 +188,7 @@ def _min_max_help(x, y, func_name):
 
 
 def lib_min_max(
-        ctx: TranspilerContext, arguments: List[CompileTimeValue], token, func_name
+        ctx: TranspilerContext, arguments: List[Cpl], token, func_name
 ):
     if len(arguments) == 0:
         raise_syntax_error(f"Expected at least 1 argument for Math.{func_name}()", token)
@@ -234,15 +228,15 @@ def lib_min_max(
     return result
 
 
-def lib_min(ctx: TranspilerContext, arguments: List[CompileTimeValue], token):
+def lib_min(ctx: TranspilerContext, arguments: List[Cpl], token):
     return lib_min_max(ctx, arguments, token, "min")
 
 
-def lib_max(ctx: TranspilerContext, arguments: List[CompileTimeValue], token):
+def lib_max(ctx: TranspilerContext, arguments: List[Cpl], token):
     return lib_min_max(ctx, arguments, token, "max")
 
 
-def lib_random(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_random(ctx: TranspilerContext, args: List[Cpl], token):
     tr = ctx.transpiler
     min_ = (args and args[0]) or CplInt(token, 0)
     max_ = args[1] if len(args) > 1 else CplInt(token, 2147483647)
@@ -306,7 +300,7 @@ def pseudo_int(ctx, cpl):
     raise ValueError("Unexpected input")
 
 
-def lib_frandom(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_frandom(ctx: TranspilerContext, args: List[Cpl], token):
     if len(args) != 2:
         raise_syntax_error("Expected 2 arguments for Math.frandom()", token)
     if args[0].unique_type.type != "float" or args[1].unique_type.type != "float":
@@ -315,7 +309,7 @@ def lib_frandom(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, score.location, "float")
 
 
-def lib_ipow(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_ipow(ctx: TranspilerContext, args: List[Cpl], token):
     tr = ctx.transpiler
     if len(args) != 2:
         raise_syntax_error(f"Expected 2 arguments for Math.ipow()", token)
@@ -363,7 +357,7 @@ def lib_ipow(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return output
 
 
-def lib_fastexp(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastexp(ctx: TranspilerContext, args: List[Cpl], token):
     score = helper_float0(ctx, args, token, "Math.fastexp")
     if isinstance(score, float):
         return CplFloat(token, math.exp(score))
@@ -377,7 +371,7 @@ def lib_fastexp(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return score
 
 
-def lib_exp(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_exp(ctx: TranspilerContext, args: List[Cpl], token):
     tr = ctx.transpiler
     score = helper_float0(ctx, args, token, "Math.exp", "__exp__x __temp__")
     if isinstance(score, float):
@@ -407,7 +401,7 @@ def lib_exp(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__exp__output __temp__", "float")
 
 
-def lib_sin_cos(ctx: TranspilerContext, args: List[CompileTimeValue], token, cos):
+def lib_sin_cos(ctx: TranspilerContext, args: List[Cpl], token, cos):
     name = "cos" if cos else "sin"
     x = helper_float0(ctx, args, token, f"Math.{name}", f"__{name}__x __temp__")
     if isinstance(x, float):
@@ -454,15 +448,15 @@ def lib_sin_cos(ctx: TranspilerContext, args: List[CompileTimeValue], token, cos
     return x1
 
 
-def lib_sin(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_sin(ctx: TranspilerContext, args: List[Cpl], token):
     return lib_sin_cos(ctx, args, token, False)
 
 
-def lib_cos(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_cos(ctx: TranspilerContext, args: List[Cpl], token):
     return lib_sin_cos(ctx, args, token, True)
 
 
-def lib_tan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_tan(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.tan")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -470,7 +464,7 @@ def lib_tan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_sin(ctx, args, token)._set_div(ctx, lib_cos(ctx, args, token))
 
 
-def lib_csc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_csc(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.csc")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -478,7 +472,7 @@ def lib_csc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplFloat(token, 1)._div(ctx, lib_sin(ctx, args, token))
 
 
-def lib_sec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_sec(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.sec")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -486,7 +480,7 @@ def lib_sec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplFloat(token, 1)._div(ctx, lib_cos(ctx, args, token))
 
 
-def lib_cot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_cot(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.cot")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -494,7 +488,7 @@ def lib_cot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplFloat(token, 1)._div(ctx, lib_tan(ctx, args, token))
 
 
-def lib_fastarcsin(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarcsin(ctx: TranspilerContext, args: List[Cpl], token):
     x = helper_float0(ctx, args, token, f"Math.fastarcsin", f"__fastarcsin__x __temp__")
     if isinstance(x, float):
         return CplFloat(token, math.asin(x))
@@ -545,7 +539,7 @@ def lib_fastarcsin(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return x
 
 
-def lib_fastarccos(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarccos(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.fastarccos")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -555,7 +549,7 @@ def lib_fastarccos(ctx: TranspilerContext, args: List[CompileTimeValue], token):
             ._set_mul(ctx, CplFloat(token, -1)))
 
 
-def lib_fastarctan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarctan(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.fastarctan")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -573,7 +567,7 @@ def lib_fastarctan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_fastarcsin(ctx, [x], token)
 
 
-def lib_fastarccsc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarccsc(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.fastarccsc")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -581,7 +575,7 @@ def lib_fastarccsc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_fastarcsin(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
 
 
-def lib_fastarcsec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarcsec(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.fastarcsec")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -589,7 +583,7 @@ def lib_fastarcsec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_fastarccos(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
 
 
-def lib_fastarccot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_fastarccot(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.fastarccot")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -597,7 +591,7 @@ def lib_fastarccot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_fastarctan(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
 
 
-def lib_arcsin(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arcsin(ctx: TranspilerContext, args: List[Cpl], token):
     x = helper_float0(ctx, args, token, f"Math.arcsin", "__arcsin__x __temp__")
     if isinstance(x, float):
         return CplFloat(token, math.asin(x))
@@ -624,7 +618,7 @@ def lib_arcsin(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return y
 
 
-def lib_arccos(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arccos(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.arccos")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -635,7 +629,7 @@ def lib_arccos(ctx: TranspilerContext, args: List[CompileTimeValue], token):
             ._set_mul(ctx, CplFloat(token, -1)))
 
 
-def lib_arctan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arctan(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.arctan")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -654,7 +648,7 @@ def lib_arctan(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_arcsin(ctx, [x], token)
 
 
-def lib_arccsc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arccsc(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.arccsc")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -663,7 +657,7 @@ def lib_arccsc(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_arcsin(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
 
 
-def lib_arcsec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arcsec(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.arcsec")
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
@@ -672,7 +666,7 @@ def lib_arcsec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return lib_arccos(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
 
 
-def lib_arccot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_arccot(ctx: TranspilerContext, args: List[Cpl], token):
     helper_float0_check(ctx, args, token, f"Math.arccot")
 
     x = args[0]
@@ -685,7 +679,7 @@ def lib_arccot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 factorial_map = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600]
 
 
-def lib_factorial(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_factorial(ctx: TranspilerContext, args: List[Cpl], token):
     if len(args) != 1:
         raise_syntax_error(f"Expected 1 argument for Math.factorial()", token)
     n = args[0]

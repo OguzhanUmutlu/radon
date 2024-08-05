@@ -1,13 +1,12 @@
 from typing import List
 
-from ..cpl._base import CompileTimeValue
-from ..cpl.score import CplScore
+from ..cpl import Cpl, CplScore
 from ..error import raise_syntax_error
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import FLOAT_PREC
 
 
-def lib_time(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_time(ctx: TranspilerContext, args: List[Cpl], token):
     if len(args) != 0:
         raise_syntax_error("time() takes no arguments", token)
     tr = ctx.transpiler
@@ -16,7 +15,7 @@ def lib_time(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     return CplScore(token, "__time__time__ __temp__", "int")
 
 
-def lib_ftime(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_ftime(ctx: TranspilerContext, args: List[Cpl], token):
     if len(args) != 0:
         raise_syntax_error("ftime() takes no arguments", token)
     tr = ctx.transpiler

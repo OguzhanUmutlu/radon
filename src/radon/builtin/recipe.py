@@ -1,15 +1,13 @@
 import json
 from typing import List
 
-from ..cpl._base import CompileTimeValue
-from ..cpl.int import CplInt
-from ..cpl.object import CplObject
+from ..cpl import Cpl, CplInt, CplObject
 from ..error import raise_syntax_error
 from ..transpiler import add_lib, TranspilerContext, CustomCplObject
 from ..utils import VariableDeclaration, get_uuid
 
 
-def lib_recipe_add(ctx: TranspilerContext, arguments: List[CompileTimeValue], token):
+def lib_recipe_add(ctx: TranspilerContext, arguments: List[Cpl], token):
     tr = ctx.transpiler
     if len(arguments) < 1:
         raise_syntax_error("Recipe.table() requires at least 1 argument", token)

@@ -206,22 +206,12 @@ def raw_group_args(token):
         map(lambda x: GroupToken(token.code, x[0].start, x[-1].end, x), split_tokens(token.children, ",")))
 
 
-from .cpl._base import CompileTimeValue
-from .cpl.int import CplInt
-from .cpl.float import CplFloat
-from .cpl.string import CplString
-from .cpl.array import CplArray
-from .cpl.tuple import CplTuple
-from .cpl.object import CplObject
-from .cpl.score import CplScore
-from .cpl.selector import CplSelector
-from .cpl.nbt import CplNBT, val_nbt
-from .cpl.nbtobject import CplObjectNBT
-from .cpl.nbtarray import CplArrayNBT
+from .cpl import Cpl, CplInt, CplFloat, CplString, CplArray, CplTuple, CplObject, CplScore, CplSelector, CplNBT, \
+    CplObjectNBT, CplArrayNBT, val_nbt
 
 
 class CustomCplObject(CplObject):
-    def __init__(self, obj: Dict[str, CompileTimeValue | Any] = None, raw_functions: Dict[str, Any] = None):
+    def __init__(self, obj: Dict[str, Cpl | Any] = None, raw_functions: Dict[str, Any] = None):
         super().__init__(None)
         self.obj = obj or {}
         self.raw_functions = raw_functions or {}
@@ -241,10 +231,10 @@ class CustomCplObject(CplObject):
                 return fn(ctx, arguments, token)
         return None
 
-    def _get_index(self, ctx, index: CompileTimeValue):
+    def _get_index(self, ctx, index: Cpl):
         if (isinstance(index, CplString)
                 and index.value in self.obj
-                and isinstance(self.obj[index.value], CompileTimeValue)):
+                and isinstance(self.obj[index.value], Cpl)):
             return self.obj[index.value]
         return None
 
@@ -258,7 +248,7 @@ def _type_to_cpl(
 
 
 def py_to_cpl(v):
-    if isinstance(v, CompileTimeValue):
+    if isinstance(v, Cpl):
         return v
     if isinstance(v, str):
         return CplString(None, v)
@@ -494,7 +484,7 @@ class Transpiler:
                 f"Invalid arguments. Expected usage: {name}({', '.join(map(str, args1))}), but got: {name}({', '.join(map(str, args2))})",
                 base)
 
-    def get_fn(self, name, arguments: List[CompileTimeValue | CplDef], base) -> FunctionDeclaration | None:
+    def get_fn(self, name, arguments: List[Cpl | CplDef], base) -> FunctionDeclaration | None:
         for fn in self.functions:
             if fn.name == name and self.check_args(fn.arguments, arguments, base):
                 return fn
@@ -609,7 +599,7 @@ class Transpiler:
                             name=name,
                             function=v
                         ))
-                    elif isinstance(v, CompileTimeValue):
+                    elif isinstance(v, Cpl):
                         if name not in self.variables:
                             self.variables[name] = VariableDeclaration(name, v, True)
                 return True
@@ -950,6 +940,11 @@ class Transpiler:
         for statement in statements:
             self._transpile_statement(ctx, statement)
 
+    def _transpile_str(self, ctx: TranspilerContext, code: str):
+        tokens, macros = tokenize(code)
+        statements = parse(tokens, macros, list(self.classes.keys()))
+        self._transpile(ctx, statements)
+
     def _run_safe(self, folder_name, statements, ctx: TranspilerContext):
         eid = get_uuid()
         file_name = f"{folder_name}/{eid}"
@@ -1117,7 +1112,7 @@ class Transpiler:
 
         return cmd_str, has_repl
 
-    def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> CompileTimeValue:
+    def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> Cpl:
         file = ctx.file
         cmd = pointer.value
         cmd_str, has_repl = self.proc_cmd(ctx, cmd, pointer)
@@ -1171,7 +1166,7 @@ class Transpiler:
 
     def _var_to_cpl_or_none(
             self, ctx: TranspilerContext, t: Token
-    ) -> Union[CompileTimeValue, None]:
+    ) -> Union[Cpl, None]:
         if isinstance(t, SelectorIdentifierToken):
             name = t.name.value
             if name in ENTITIES_OBJ.content:
@@ -1246,14 +1241,14 @@ class Transpiler:
 
     def variable_token_to_cpl(
             self, ctx: TranspilerContext, t: Token
-    ) -> CompileTimeValue:
+    ) -> Cpl:
         res = self._var_to_cpl_or_none(ctx, t)
         if res is None:
             raise_syntax_error(f"Variable '{t.value}' was not found", t)
             assert False
         return res
 
-    def chain_to_cpl(self, ctx: TranspilerContext, t: List[Token]) -> CompileTimeValue:
+    def chain_to_cpl(self, ctx: TranspilerContext, t: List[Token]) -> Cpl:
         cpl = self.token_to_cpl(ctx, t[0])
         for token in t[1:]:
             if token.type == TokenType.IDENTIFIER:
@@ -1306,7 +1301,7 @@ class Transpiler:
     def arg_tokens_to_cpl(self, ctx: TranspilerContext, tokens: List[Token]):
         return list(map(lambda x: self.chains_to_cpl(ctx, chain_tokens(x)), split_tokens(tokens, ",")))
 
-    def token_to_cpl(self, ctx: TranspilerContext, t: Token):
+    def token_to_cpl(self, ctx: TranspilerContext, t: Token, variable_error=True):
         if t.type == TokenType.INT_LITERAL:
             if abs(int(t.value)) > INT_LIMIT:
                 raise_syntax_error(
@@ -1328,6 +1323,8 @@ class Transpiler:
                 or t.type == TokenType.BLOCK_IDENTIFIER
                 or t.type == TokenType.IDENTIFIER
         ):
+            if not variable_error:
+                return self._var_to_cpl_or_none(ctx, t)
             return self.variable_token_to_cpl(ctx, t)
         if isinstance(t, GroupToken) and t.func:
             return self.run_function(ctx, t)
@@ -1380,7 +1377,7 @@ class Transpiler:
 
     def chains_to_cpl(
             self, ctx: TranspilerContext, chains: List[List[Token]]
-    ) -> CompileTimeValue:
+    ) -> Cpl:
         if len(chains) == 0:
             return CplInt(None, 0)
         if len(chains) == 1:
@@ -1436,19 +1433,12 @@ class Transpiler:
         if t1[0].value in SET_OP:
             is_constant = constant_keyword
             # TODO: [a, b, c] = [1, 2, 3] syntax and also for objects
-            if (
-                    t0[0].type != TokenType.IDENTIFIER
-                    and t0[0].type != TokenType.SELECTOR_IDENTIFIER
-                    and t0[0].type != TokenType.BLOCK_IDENTIFIER
-            ):
-                raise_syntax_error("Invalid variable name", t0[0])
-                raise ValueError("")
             if len(chains) < 3:
                 raise_syntax_error("Expected an expression for the assignment", t1[0])
             cpl = self.chains_to_cpl(ctx, chains[2:])
             if t0[0].value == "this" and not ctx.class_name:
                 raise_syntax_error("Cannot access 'this' keyword outside of a class", t0[0])
-            variable = self._var_to_cpl_or_none(ctx, t0[0])
+            variable = self.token_to_cpl(ctx, t0[0], False)
 
             var_name_token = t0[0]
             var_name = var_name_token.value
@@ -1519,7 +1509,7 @@ class Transpiler:
 
         expr = make_expr(chains)
 
-        stack: List[CompileTimeValue] = []
+        stack: List[Cpl] = []
 
         for chain in expr:
             if chain[0].type != TokenType.OPERATOR:
@@ -1539,7 +1529,7 @@ class Transpiler:
 
     def tokens_to_cpl(
             self, ctx: TranspilerContext, tokens: List[Token]
-    ) -> CompileTimeValue:
+    ) -> Cpl:
         if len(tokens) == 0:
             return CplInt(None, 0)
         chains = chain_tokens(tokens)
@@ -1549,10 +1539,10 @@ class Transpiler:
             self,
             ctx: TranspilerContext,
             name: str,
-            args: List[CompileTimeValue],
+            args: List[Cpl],
             base: Union[Token, None] = None,
             class_name: str | None = None
-    ) -> CompileTimeValue:
+    ) -> Cpl:
         exists_fn = self.fn_exists(name)
 
         if not exists_fn and name not in builtin_fns:
@@ -1683,7 +1673,7 @@ class Transpiler:
 
     def run_function(
             self, ctx: TranspilerContext, t: GroupToken
-    ) -> CompileTimeValue:
+    ) -> Cpl:
         if not t.func:
             return CplInt(t, 0)
 
@@ -1697,7 +1687,7 @@ class Transpiler:
                 raw_args = built[0].raw_args
 
         separated = split_tokens(t.children, ",")
-        arguments: List[CompileTimeValue] = []
+        arguments: List[Cpl] = []
         for index, arg in enumerate(separated):
             arguments.append(arg if index in raw_args else self.tokens_to_cpl(ctx, arg))
 

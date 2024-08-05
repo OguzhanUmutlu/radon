@@ -1,9 +1,7 @@
 import json
 from typing import List
 
-from ..cpl._base import CompileTimeValue
-from ..cpl.score import CplScore
-from ..cpl.string import CplString
+from ..cpl import Cpl, CplScore, CplString
 from ..transpiler import FunctionDeclaration, TranspilerContext, add_lib
 from ..utils import get_uuid
 
@@ -16,7 +14,7 @@ def get_fn_or_none(ctx, arr, index, token):
     return None
 
 
-def lib_raycast(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+def lib_raycast(ctx: TranspilerContext, args: List[Cpl], token):
     ctx.transpiler.dp_files[f"tags/block{ctx.transpiler.s}/__raycast__/default_raycast_pass.json"] = json.dumps({
         "values": [
             "minecraft:short_grass" if ctx.transpiler.pack_format >= 48 else "minecraft:grass",

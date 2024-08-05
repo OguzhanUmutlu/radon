@@ -1,11 +1,7 @@
 import json
 from typing import List
 
-from ..cpl.int import CplInt
-from ..cpl.nbt import val_nbt, CplNBT
-from ..cpl.nbtstring import CplStringNBT
-from ..cpl.object import CplObject
-from ..cpl.score import CplScore
+from ..cpl import CplInt, val_nbt, CplNBT, CplStringNBT, CplObject, CplScore
 from ..error import raise_syntax_error
 from ..tokenizer import GroupToken, cpl_def_from_tokens, Token
 from ..transpiler import TranspilerContext, add_lib, CustomCplObject, FunctionDeclaration
@@ -118,6 +114,23 @@ def lib_run_cmd(ctx: TranspilerContext, args: List[GroupToken], token: GroupToke
     return ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
 
 
+def lib_score(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
+    if len(args) not in (1, 2):
+        raise_syntax_error(f"Expected 1 or 2 arguments for __score__()", token)
+    if len(args) == 2 and args[1].value not in {"int", "float"}:
+        raise_syntax_error(f"Expected 'int' or 'float' for the second argument of __score__()", token)
+    return CplScore(token, args[0].value, args[1].value if len(args) == 2 else None)
+
+
+def lib_nbt(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
+    if len(args) != 2:
+        raise_syntax_error(f"Expected 2 arguments for __nbt__()", token)
+    df = cpl_def_from_tokens(ctx.transpiler.classes, args[1].children)
+    if df is None:
+        raise_syntax_error("Invalid NBT type given for __nbt__()", token)
+    return val_nbt(token, args[0].value, df)
+
+
 add_lib(VariableDeclaration(
     name="Data",
     type=CustomCplObject({}, {
@@ -144,4 +157,12 @@ add_lib(VariableDeclaration(
     name="runCommand",
     type="python-raw",
     function=lib_run_cmd
+), FunctionDeclaration(
+    name="__score__",
+    type="python-raw",
+    function=lib_score
+), FunctionDeclaration(
+    name="__nbt__",
+    type="python-raw",
+    function=lib_nbt
 ))
