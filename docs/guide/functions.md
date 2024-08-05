@@ -59,25 +59,6 @@ function your_namespace:my_function {a: 10}
 
 ***
 
-If you want to use function arguments without macros, you can use NBT. Here's an example:
-
-```js
-fn my_function(int a) {
-  print("The integer you gave is: ", a)
-}
-
-// From the game run this to set the first argument:
-data modify storage fn_args a append value 10 // Sets the `a` argument to 10
-function your_namespace:my_function
-```
-
-:::warning
-If the function is constantly being used, as you might have guessed the argument NBT holder will not stay as the value
-you set. If this is the case you can solve it by putting it into a function file.
-:::
-
-***
-
 Calculating nth fibonacci number:
 
 ```js
