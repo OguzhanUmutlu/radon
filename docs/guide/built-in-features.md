@@ -97,12 +97,12 @@ function call. Here's a simple example that redirects the player to Radon's docu
 print(
     fmt("Click me to view the Radon documentation!")
         .click("open_url", "https://oguzhanumutlu.github.io/radon")
-        .hover("open_url", "https://oguzhanumutlu.github.io/radon")
+        .hover("show_text", "Hello, world!")
 )
 ```
 
 ```mcfunction
-tellraw @a {"text":"Click me to view the Radon documentation!","clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"},"hoverEvent":{"action":"open_url","contents":"https://oguzhanumutlu.github.io/radon"}}
+tellraw @a {"text":"Click me to view the Radon documentation!","clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"},"hoverEvent":{"action":"show_text","contents":"Hello, world!"}}
 ```
 
 You can also add child text components by using the `.extend` function attached to the `fmt()` function call. Child
@@ -135,7 +135,7 @@ print(
     fmt(red, "Hello, ")
         .extend(
             fmt(bold, "world!")
-                .hover("open_url", "https://oguzhanumutlu.github.io/radon")
+                .hover("show_text", "Hello, world!")
                 .click("open_url", "https://oguzhanumutlu.github.io/radon")
         )
 )
@@ -167,7 +167,7 @@ print(fmt(obfuscated, "Obfuscated text"))
 ```
 
 ```mcfunction
-tellraw @a {"text":"Hello, ","color":"red","extra":[{"text":"world!","bold":true,"hoverEvent":{"action":"open_url","contents":"https://oguzhanumutlu.github.io/radon"},"clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"}}]}
+tellraw @a {"text":"Hello, ","color":"red","extra":[{"text":"world!","bold":true,"hoverEvent":{"action":"show_text","contents":"Hello, world!"},"clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"}}]}
 tellraw @a {"text":"Custom colored text","color":"#123456"}
 tellraw @a {"text":"Black text","color":"black"}
 tellraw @a {"text":"Dark blue text","color":"dark_blue"}
