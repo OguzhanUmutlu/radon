@@ -30,7 +30,7 @@ GRAY = "\x1b[90m"
 class RadonArgumentParser(ArgumentParser):
     def __init__(self):
         super().__init__()
-        self.add_argument("command", nargs="?", default="build", choices=["build", "watch"],
+        self.add_argument("command", nargs="?", default="build", choices=["build", "watch", "version"],
                           help="The command to run (build or watch)")
         self.add_argument("-d", default=os.getcwd(), type=str, help="sets the working directory")
         self.add_argument("-b", action="store_true", help="toggles debug mode")
@@ -317,6 +317,10 @@ def main():
         took = time() - start
 
         print(f"{GREEN}Datapack has been built!{GRAY} ({took:.5f}s){RESET}")
+        sys.exit(0)
+
+    if args.command == "version":
+        print(f"{YELLOW}Radon v{VERSION_RADON}{RESET}")
         sys.exit(0)
 
     files_snapshot = watch_snapshot()
