@@ -192,6 +192,8 @@ tellraw @a {"text":"Strikethrough text","strikethrough":true}
 tellraw @a {"text":"Obfuscated text","obfuscated":true}
 ```
 
+:::
+
 </details>
 
 ## Listener.on("firstJoin", callback)
