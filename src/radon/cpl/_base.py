@@ -1,8 +1,31 @@
-from typing import Union, Any, List
+import json
+from types import FunctionType
+from typing import Union, Any, List, Dict
 
 from ..error import raise_syntax_error, raise_syntax_error_t
-from ..tokenizer import Token, GroupToken, split_tokens
+from ..tokenizer import Token, GroupToken
 from ..utils import CplDef, get_uuid
+
+
+def tellraw_dumps(obj):
+    if isinstance(obj, FunctionType):
+        return obj()
+    if isinstance(obj, str) or isinstance(obj, bool):
+        return json.dumps(obj)
+    if isinstance(obj, list):
+        return '[' + ",".join(map(tellraw_dumps, obj)) + ']'
+    if isinstance(obj, dict):
+        return '{' + ",".join(map(lambda x: f'"{x[0]}":{tellraw_dumps(x[1])}', obj.items())) + '}'
+    raise ValueError("Unexpected tellraw value: " + str(obj))
+
+
+def _call_obj(obj):
+    for k in obj:
+        if isinstance(obj[k], FunctionType):
+            obj[k] = obj[k]()
+        if isinstance(obj[k], Dict):
+            _call_obj(obj[k])
+    return obj
 
 
 class CompileTimeValue:
@@ -96,7 +119,7 @@ class CompileTimeValue:
             nbt_got_id = get_uuid()
             nbt_loc = f"storage temp _{nbt_got_id}"
         if not score_loc and force != "nbt":
-            t = self.unique_type if force_t is None else force_t
+            t = force_t or self.unique_type.type
             score_loc = f"{t}_{nbt_got_id or get_uuid()} __temp__"
         return self._cache(ctx, score_loc, nbt_loc, force, force_t)
 
@@ -114,6 +137,14 @@ class CompileTimeValue:
 
     def _raw_call_index(self, ctx, index, arguments, token):
         # type: (TranspilerContext, str, List[GroupToken], Token) -> CompileTimeValue | int | None
+        return None
+
+    def _call(self, ctx, arguments):
+        # type: (TranspilerContext, List[CompileTimeValue]) -> CompileTimeValue | None
+        return None
+
+    def _raw_call(self, ctx, arguments, token):
+        # type: (TranspilerContext, List[GroupToken], Token) -> CompileTimeValue | None
         return None
 
     def get_index(self, ctx, index, token=None):
@@ -162,7 +193,13 @@ class CompileTimeValue:
         return r
 
     def call(self, ctx, arguments, token=None):
-        # type: (TranspilerContext, List[CompileTimeValue], Token | None) -> CompileTimeValue
+        # type: (TranspilerContext, List[CompileTimeValue] | GroupToken, Token | None) -> CompileTimeValue
+        if isinstance(arguments, GroupToken):
+            raw_res = self._raw_call(ctx, raw_group_args(arguments), arguments)
+            if raw_res is not None:
+                return raw_res
+            arguments = ctx.transpiler.arg_tokens_to_cpl(ctx, arguments.children)
+
         st = self.token
         if not st:
             self.token = token
@@ -173,10 +210,6 @@ class CompileTimeValue:
         if isinstance(r, int):
             raise_syntax_error(f"Expected {r} arguments for {self.unique_type}()", token or self.token)
         return r
-
-    def _call(self, ctx, arguments):
-        # type: (TranspilerContext, List[CompileTimeValue]) -> CompileTimeValue | None
-        return None
 
     def _set(self, ctx, cpl):
         return None
@@ -244,11 +277,15 @@ class CompileTimeValue:
     def _or(self, ctx, cpl):
         return None
 
-    def tellraw_object(self, ctx):
+    def tellraw_object(self, ctx) -> Dict:
         raise_syntax_error(
             f"Cannot read {self.unique_type} value with a $str() macro",
             self.token
         )
+        return {}
+
+    def tellraw_object_str(self, ctx):
+        return tellraw_dumps(self.tellraw_object(ctx))
 
     def __iadd__(self, other):
         self._set_add(other[0], other[1])

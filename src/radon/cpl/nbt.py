@@ -25,6 +25,18 @@ class CplNBT(CompileTimeValue):
         cpl.cache(ctx, nbt_loc=self.location, force="nbt")
         return self
 
+    def _eq_neq(self, ctx, cpl, is_eq):
+        if self.unique_type != cpl.unique_type:
+            return CplInt(self.token, 0)
+        val = cpl._cache(ctx, force="nbt")
+        score = CplScore(self.token, f"int_{get_uuid()} __temp__")
+        ctx.file.append(
+            f"execute store success score {score.location} run data modify {val.location} set from {self.location}")
+        if not is_eq:
+            score._sub(ctx, CplInt(self.token, 1))
+            score._mul(ctx, CplInt(self.token, -1))
+        return score
+
     def tellraw_object(self, ctx):
         ls = self.location.split(" ")
         ls1 = ls[1]
@@ -32,7 +44,10 @@ class CplNBT(CompileTimeValue):
         if ls[0] == "block":
             ls1 = ls[1] + " " + ls[2] + " " + ls[3]
             ls2 = " ".join(ls[4:])
-        return '{"' + ls[0] + '":"' + ls1 + '","nbt":"' + ls2 + '"}'
+        return {
+            ls[0]: ls1,
+            "nbt": ls2
+        }
 
     def get_data_str(self, ctx):
         return f"from {self.location}"
@@ -72,3 +87,5 @@ from .nbtfloat import CplFloatNBT
 from .nbtint import CplIntNBT
 from .nbtobject import CplObjectNBT
 from .nbtstring import CplStringNBT
+from .int import CplInt
+from .score import CplScore

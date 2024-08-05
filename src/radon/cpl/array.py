@@ -76,7 +76,7 @@ class CplArray(CompileTimeValue):
         py_v = self.get_py_value()
         if py_v is None:
             return self.cache(ctx).tellraw_object(ctx)
-        return json.dumps(py_v)
+        return {"text": json.dumps(py_v)}
 
 
 from .float import CplFloat

@@ -32,32 +32,49 @@ def helper_float0(ctx: TranspilerContext, args: List[CompileTimeValue], token, m
 
 def lib_sqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     tr = ctx.transpiler
-    helper = helper_float0(ctx, args, token, "Math.sqrt", "__sqrt__x")
+    helper = helper_float0(ctx, args, token, "Math.sqrt", "__sqrt__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, math.sqrt(helper))
 
     if "has_sqrt_init" not in tr.data:
         tr.data["has_sqrt_init"] = True
         tr.files["__load__"].append("scoreboard players set __sqrt__2 __temp__ 2")
-        tr.files["__load__"].append("scoreboard players set __sqrt__4 __temp__ 4")
 
-    ctx.file.extend(
-        [
-            "scoreboard players operation __sqrt__x __temp__ /= __sqrt__4 __temp__",
-            "scoreboard players operation __sqrt__output __temp__ = __sqrt__x __temp__",
-            f"function {tr.pack_namespace}:__lib__/__sqrt__loop",
-        ]
-    )
+    # y^2 - x = 0
+    # y -= (y^2 - x)/(2 y)
 
-    tr.files["__lib__/sqrt_loop"] = [
-        "scoreboard players operation __sqrt__last_output __temp__ = __sqrt__output __temp__",
-        "scoreboard players operation __sqrt__output __temp__ /= __sqrt__2 __temp__",
-        "scoreboard players operation __sqrt__x_t __temp__ =  __sqrt__x __temp__",
-        "scoreboard players operation __sqrt__x_t __temp__ /= __sqrt__output __temp__",
-        "scoreboard players operation __sqrt__x_t __temp__ *= FLOAT_PREC __temp__",
-        "scoreboard players operation __sqrt__output __temp__ += __sqrt__x_t __temp__",
-        "execute unless score __sqrt__last_output __temp__ = __sqrt__output __temp__ run function $PACK_NAME$:__lib__/__sqrt__loop",
-    ]
+    # y -= (y - x/y) / 2
+
+    # z = y
+    # w = x
+    # w /= y
+    # z -= w
+    # z /= 2
+
+    # y -= z
+
+    last_y = CplScore(token, "__sqrt__last_output __temp__", "float")
+    y = CplScore(token, "__sqrt__output __temp__", "float")
+    z = CplScore(token, "__sqrt__z __temp__", "float")
+    w = CplScore(token, "__sqrt__w __temp__", "float")
+
+    # initial guess: y = x
+    y._set(ctx, helper)
+
+    if "__lib__/sqrt_loop" not in tr.files:
+        fil = [f"scoreboard players operation {last_y.location} = {y.location}"]
+        tr.files["__lib__/sqrt_loop"] = fil
+        loop_ctx = ctx.clone_at("__lib__/sqrt_loop")
+        z._set(loop_ctx, y)
+        w._set(loop_ctx, helper)
+        w._set_div(loop_ctx, y)
+        z._set_sub(loop_ctx, w)
+        z._set_div(loop_ctx, CplScore(token, "__sqrt__2 __temp__", "int"))
+        y._set_sub(loop_ctx, z)
+        fil.append(
+            f"execute unless score {last_y.location} = {y.location} run function {tr.pack_namespace}:__lib__/sqrt_loop")
+
+    ctx.file.append(f"function {tr.pack_namespace}:__lib__/sqrt_loop")
 
     return CplScore(token, "__sqrt__output __temp__", "float")
 
@@ -102,7 +119,7 @@ def lib_isqrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
 def lib_cbrt(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     tr = ctx.transpiler
-    helper = helper_float0(ctx, args, token, "Math.cbrt", "__cbrt__x")
+    helper = helper_float0(ctx, args, token, "Math.cbrt", "__cbrt__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, helper ** (1 / 3))
 
@@ -147,7 +164,7 @@ def lib_floor(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
 
 def lib_ceil(ctx: TranspilerContext, args: List[CompileTimeValue], token):
-    helper = helper_float0(ctx, args, token, "Math.ceil", "__ceil__x")
+    helper = helper_float0(ctx, args, token, "Math.ceil", "__ceil__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, math.ceil(helper))
     n = args[0]
@@ -160,7 +177,7 @@ def lib_ceil(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
 
 def lib_round(ctx: TranspilerContext, args: List[CompileTimeValue], token):
-    helper = helper_float0(ctx, args, token, "Math.round", "__round__x")
+    helper = helper_float0(ctx, args, token, "Math.round", "__round__x __temp__")
     if isinstance(helper, float):
         return CplFloat(token, round(helper))
     n = args[0]
@@ -657,11 +674,33 @@ def lib_arcsec(ctx: TranspilerContext, args: List[CompileTimeValue], token):
 
 def lib_arccot(ctx: TranspilerContext, args: List[CompileTimeValue], token):
     helper_float0_check(ctx, args, token, f"Math.arccot")
+
     x = args[0]
     if isinstance(x, CplInt) or isinstance(x, CplFloat):
         return CplFloat(token, math.atan(1 / x.value))
 
     return lib_arctan(ctx, [CplFloat(token, 1)._div(ctx, x)], token)
+
+
+factorial_map = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600]
+
+
+def lib_factorial(ctx: TranspilerContext, args: List[CompileTimeValue], token):
+    if len(args) != 1:
+        raise_syntax_error(f"Expected 1 argument for Math.factorial()", token)
+    n = args[0]
+    if n.unique_type.type not in {"int", "float"}:
+        raise_syntax_error(f"Expected an int or float argument for Math.factorial()", token)
+    if isinstance(n, CplInt) or isinstance(n, CplFloat):
+        return CplInt(token, factorial_map[int(n.value)])
+    if isinstance(n, CplNBT):
+        n = n.cache(ctx, force="score", force_t="int")
+    ctx.file.append(f"scoreboard players set __factorial__output __temp__ 0")
+    for index, value in enumerate(factorial_map):
+        ctx.file.append(
+            f"execute if score {n.location} matches {index} run scoreboard players set __factorial__output __temp__ {value}")
+
+    return CplScore(token, "__factorial__output __temp__", "int")
 
 
 add_lib(VariableDeclaration(
@@ -698,6 +737,7 @@ add_lib(VariableDeclaration(
         "fastarccsc": lib_fastarccsc,
         "fastarcsec": lib_fastarcsec,
         "fastarccot": lib_fastarccot,
+        "factorial": lib_factorial,
         "PI": CplFloat(None, math.pi),
         "E": CplFloat(None, math.e),
         "LN2": CplFloat(None, math.log(2)),

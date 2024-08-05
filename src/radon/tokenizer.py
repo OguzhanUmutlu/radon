@@ -64,7 +64,7 @@ KEYWORDS = [
     "define",
     # "int",
     # "float",
-    "string",
+    # "string",
     "from",
     "import",
     "as",
@@ -115,6 +115,9 @@ class GroupToken(Token):
         self.close: Token = EmptyToken
         self.func: Token | None = None
         self._temp: Any = None
+
+    def cpl(self, ctx):
+        return ctx.transpiler.tokens_to_cpl(ctx, self.children)
 
 
 EmptyGroup: GroupToken = Token("", TokenType.GROUP, 0, 0)  # type: ignore
@@ -450,9 +453,7 @@ def _tokenize_iterate(
     if char in SYMBOL:
         tokens.append(Token(code, TokenType.SYMBOL, index[0], index[0] + 1))
         return
-    if (char == "#") or (
-            char == "/" and index[0] != len(code) - 1 and code[index[0] + 1] == "/"
-    ):
+    if char == "/" and index[0] != len(code) - 1 and code[index[0] + 1] == "/":
         while index[0] < len(code):
             if code[index[0]] == "\n":
                 index[0] -= 1
@@ -524,7 +525,7 @@ def _tokenize_iterate(
         type = TokenType.KEYWORD
     elif str.isnumeric(value):
         type = TokenType.INT_LITERAL
-    if value not in KEYWORDS and len(tokens) > 0 and tokens[-1].value == "-" and (
+    if type == TokenType.INT_LITERAL and len(tokens) > 0 and tokens[-1].value == "-" and (
             len(tokens) == 1 or tokens[-2].type in {TokenType.OPERATOR, TokenType.SYMBOL}):
         tokens.pop()
         start_index -= 1
@@ -540,8 +541,8 @@ def _tokenize_iterate(
         tokens.append(Token(code, TokenType.FLOAT_LITERAL, start, index[0] + 1))
         return True
     new_t = Token(code, type, start_index, index[0] + 1)
-    if type == TokenType.IDENTIFIER and len(tokens) > 1 and tokens[-1].value == ":" and tokens[
-        -2].type == TokenType.IDENTIFIER:
+    if (type == TokenType.IDENTIFIER and len(tokens) > 1 and tokens[-1].value == ":"
+            and tokens[-2].type == TokenType.IDENTIFIER):
         sep = tokens.pop()
         ident = tokens.pop()
         tokens.append(SelectorIdentifierToken(code, ident.start, index[0] + 1, new_t, sep, ident))

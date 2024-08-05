@@ -4,5 +4,6 @@
   "format": "1.21",
   "main": "src/main.rn",
   "outFolder": ".",
-  "useLock": false
+  "useLock": false,
+  "removeBeforeBuild": null
 }

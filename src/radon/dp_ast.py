@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 
 from .error import raise_syntax_error
 from .tokenizer import (
@@ -145,6 +145,10 @@ operators = {
         "p": 3,
         "a": "left",
     },
+    "%": {
+        "p": 3,
+        "a": "left",
+    },
     "+": {
         "p": 2,
         "a": "left",
@@ -246,6 +250,7 @@ class StatementType(Enum):
     SCHEDULE = "schedule"
     IMPORT = "import"
     DEFINE_CLASS = "define_class"
+    DEFINE_ENUM = "define_enum"
 
 
 class Statement(UniversalStrMixin):
@@ -292,11 +297,12 @@ class IfFlowStatement(Statement):
 
 class LoopStatement(Statement):
     def __init__(
-            self, code: str, start: int, end: int, time: Token | None, body: List[Statement]
+            self, code: str, start: int, end: int, time: Token | None, body: List[Statement], step: List[Statement]
     ):
         super().__init__(StatementType.LOOP, code, start, end)
         self.time = time
         self.body = body
+        self.step = step
 
 
 class IntroduceVariableStatement(Statement):
@@ -384,6 +390,20 @@ class DefineClassStatement(Statement):
         self.methods = methods
 
 
+class DefineEnumStatement(Statement):
+    def __init__(
+            self,
+            code: str,
+            start: int,
+            end: int,
+            name: Token,
+            values: Dict[str, int | float | str]
+    ):
+        super().__init__(StatementType.DEFINE_ENUM, code, start, end)
+        self.name = name
+        self.values = values
+
+
 def read_until_curly(tokens: List[Token], start_index: int):
     length = len(tokens)
     index = start_index
@@ -461,6 +481,10 @@ def chain_tokens_iterate(tokens: List[Token], index: List[int]) -> List[Token]:
         tn = next_token(tokens, index)
         if tn is None:
             return branch
+        t_next = peek_token(tokens, index)
+        if tn.type == TokenType.EOL and t_next and t_next.value == ".":
+            index[0] += 1
+            continue
         if tn.value == ".":
             if tl.value == ".":
                 index[0] -= 2
@@ -532,9 +556,18 @@ def make_expr(chains: List[List[Token]]) -> List[List[Token]]:
     For more information: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
     """
     new_chains = []
+    last_op = False
     for index, chain in enumerate(chains):
         if chain[0].type in ENDERS:
             continue
+        if chain[0].type not in EXPR_EXPR:
+            if last_op or index == 0:
+                if chain[0].value != "-":
+                    raise_syntax_error("Expected a non-operator non-symbol token", chain[0])
+                new_chains.insert(-2, [Token("0", TokenType.INT_LITERAL, 0, 1)])
+            last_op = True
+        last_op = False
+
         new_chains.append(chain)
     chains = new_chains
     if len(chains) == 0:
@@ -579,6 +612,13 @@ def next_token(tokens: List[Token], index: List[int]):
     return tokens[index[0]]
 
 
+def peek_token(tokens: List[Token], index: List[int], offset=1):
+    i = index[0] + offset
+    if i >= len(tokens):
+        return None
+    return tokens[i]
+
+
 def parse_str(code: str):
     (tokens, macros) = tokenize(code)
     return parse(tokens, macros), macros
@@ -599,6 +639,81 @@ def parse_iterate(
     if t0.type == TokenType.EOF:
         return False
     if t0.type == TokenType.EOL or t0.type == TokenType.EOE:
+        return True
+    if t0.value == "enum":
+        # enum <name> { <body> }
+        t1 = next_token(tokens, index)  # name of the enum
+        if not t1:
+            raise_syntax_error("Expected a name for the enum", t0)
+            return False
+        if t1 is None or t1.type != TokenType.IDENTIFIER:
+            raise_syntax_error("Expected a name for the enum", t0)
+            return False
+        t2 = next_token(tokens, index)  # enum body
+        if t2 is None or not isinstance(t2, GroupToken) or t2.open.value != "{":
+            raise_syntax_error("Expected a enum body", t0)
+            return False
+        spl = split_tokens(list(filter(lambda x: x.type not in ENDERS, t2.children)), ",")
+        int_val = 0
+        int_inc = 1
+        is_string = False
+        values = {}
+        for element in spl:
+            if len(element) == 0:
+                continue
+            if len(element) != 1:
+                raise_syntax_error(
+                    "Enum elements should be in the form 'name' or 'name(value)' or 'name(value, increase)'",
+                    element[0])
+            name = element[0]
+            value = None
+            if isinstance(name, GroupToken):
+                if not name.func:
+                    raise_syntax_error("Unexpected group token", name)
+                spl_value = split_tokens(name.children)
+                name = name.func
+                if not (1 <= len(spl_value) <= 2):
+                    raise_syntax_error(
+                        "Enum elements should be in the form 'name' or 'name(value)' or 'name(value, increase)'",
+                        element[0])
+                if len(spl_value) == 1:
+                    spl_value = spl_value[0]
+                    if len(spl_value) == 1 and spl_value[0].value == "string":
+                        is_string = True
+                        values[name.value] = name.value
+                        continue
+                    if len(spl_value) != 1 or spl_value[0].type not in {TokenType.INT_LITERAL, TokenType.FLOAT_LITERAL,
+                                                                        TokenType.STRING_LITERAL}:
+                        raise_syntax_error("Enum elements can only have ints, floats or strings", name)
+                    spl0_val = spl_value[0].value
+                    if spl_value[0].type == TokenType.STRING_LITERAL:
+                        spl0_val = spl0_val[1:-1]
+                    values[name.value] = spl0_val
+                    if spl_value[0].type == TokenType.INT_LITERAL:
+                        int_val = int(spl_value[0].value)
+                        int_inc = 1
+                        is_string = False
+                else:
+                    if (len(spl_value[0]) != 1
+                            or len(spl_value[1]) != 1
+                            or spl_value[0][0].type != TokenType.INT_LITERAL
+                            or spl_value[1][0].type != TokenType.INT_LITERAL):
+                        raise_syntax_error("Enum elements can only have ints", name)
+                    values[name.value] = int(spl_value[0][0].value)
+                    int_val = int(spl_value[0][0].value)
+                    int_inc = int(spl_value[1][0].value)
+                    int_val += int_inc
+                    is_string = False
+            else:
+                if name.type != TokenType.IDENTIFIER:
+                    raise_syntax_error("Enum element names should be valid identifiers", name)
+                if is_string:
+                    values[name.value] = name.value
+                else:
+                    values[name.value] = int_val
+                    int_val += int_inc
+
+        statements.append(DefineEnumStatement(t1.code, t1.start, t2.end, t1, values))
         return True
     if t0.value == "class":
         # class <name> { <FUNCTION STATEMENTS...> }
@@ -759,11 +874,10 @@ def parse_iterate(
         it = parse(spl[2], macros, class_names)
         if len(it) != 1:
             raise_syntax_error("Expected an expression in the iterator", t0)
-        it = it[0]
 
         statements.append(init)
 
-        if_st = IfFlowStatement(
+        if_condition = IfFlowStatement(
             code=t0.code,
             start=t1.start,
             end=t1.end,
@@ -772,16 +886,16 @@ def parse_iterate(
             else_body=parse_str("break")[0],
         )
 
-        loop_st_body = [if_st]
+        loop_st_body = [if_condition]
         loop_st_body.extend(parse(body.children, macros, class_names))
-        loop_st_body.append(it)
 
         loop_st = LoopStatement(
             code=t0.code,
             start=t0.start,
             end=body.end,
             time=tim,
-            body=loop_st_body
+            body=loop_st_body,
+            step=it
         )
 
         statements.append(loop_st)
@@ -838,6 +952,7 @@ def parse_iterate(
             end=condition.end,
             time=tim,
             body=parse(body.children, macros, class_names) + [if_st],
+            step=[]
         )
 
         statements.append(loop_st)
@@ -891,7 +1006,8 @@ def parse_iterate(
             start=t0.start,
             end=body.end,
             time=tim,
-            body=loop_st_body
+            body=loop_st_body,
+            step=[]
         )
 
         statements.append(loop_st)
@@ -919,6 +1035,7 @@ def parse_iterate(
             end=body.end,
             time=tim,
             body=parse(body.children, macros, class_names),
+            step=[]
         )
 
         statements.append(statement)
@@ -1137,7 +1254,7 @@ def parse_iterate(
                 t = next_token(tokens, index)
                 if t is None:
                     raise_syntax_error("Unexpected end of file", got_tokens[-1])
-                    raise SyntaxError("")
+                    assert False
                 if isinstance(t, GroupToken) and t.open.value == "{":
                     body_g = t
                     break

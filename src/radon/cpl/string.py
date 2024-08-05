@@ -21,6 +21,8 @@ class CplString(CplLiteral):
         return self.value
 
     def _call(self, ctx, arguments):
+        if not self.is_fn_reference:
+            return None
         return ctx.transpiler.run_function_with_cpl(ctx, self.value, arguments, self.token)
 
     def _cache(self, ctx, score_loc=None, nbt_loc=None, force=None, force_t=None):
@@ -67,8 +69,15 @@ class CplString(CplLiteral):
     def _or(self, ctx, cpl):
         return cpl._or(ctx, CplInt(self.token, len(self.value)))
 
+    def _eq_neq(self, ctx, cpl, is_eq):
+        if isinstance(cpl, CplString):
+            return CplInt(self.token, (self.value == cpl.value) * is_eq)
+        if not isinstance(cpl, CplStringNBT):
+            return None
+        return cpl._eq_neq(ctx, self, is_eq)
+
     def tellraw_object(self, ctx):
-        return json.dumps(self.value)
+        return {"text": self.value}
 
 
 from .int import CplInt

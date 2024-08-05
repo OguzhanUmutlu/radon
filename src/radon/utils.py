@@ -11,7 +11,7 @@ def get_float_limit():
 
 _expr_id = 0
 
-VERSION_RADON = "1.6.6"
+VERSION_RADON = "1.9.5"
 
 
 def basic_calc(a: Union[int, float], op: str, b: Union[int, float]) -> int | float:
@@ -303,7 +303,7 @@ class CplDefSelector(CplDef):
         return "selector"
 
     def get_sample_value(self) -> str:
-        raise SyntaxError("Selectors cannot be sampled")
+        raise "Selectors cannot be sampled"
 
 
 class CplDefFunction(CplDef):
@@ -316,7 +316,7 @@ class CplDefFunction(CplDef):
         return "((" + ", ".join(map(str, self.arguments)) + ") => " + str(self.returns or "void") + ")"
 
     def get_sample_value(self) -> str:
-        raise SyntaxError("Functions cannot be sampled")
+        raise "Functions cannot be sampled"
 
 
 INT_TYPE = CplDefInt()

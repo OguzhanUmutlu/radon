@@ -43,9 +43,9 @@ refers to arguments.
 Here's a simple example:
 
 ```python
-def my_func(ctx, args):
+def my_func(ctx, args, token):
     if len(args) < 1:
-        raise SyntaxError("Expected 1 argument for my_func()")
+        raise_syntax_error("Expected 1 argument for my_func()", token)
     return args[0]
 ```
 

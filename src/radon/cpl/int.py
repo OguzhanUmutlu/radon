@@ -58,7 +58,7 @@ class CplInt(CplLiteral):
             return self.as_float()
 
     def tellraw_object(self, ctx):
-        return f'"{self.value}"'
+        return {"text": str(self.value)}
 
 
 from .nbtint import CplIntNBT

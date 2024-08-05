@@ -53,6 +53,7 @@ function transpile(namespace, packFormat, code) {
 from radon.transpiler import Transpiler
 from radon.dp_ast import parse_str
 from radon.utils import reset_expr_id
+from radon.error import RadonError
 
 def main(namespace, packFormat, code):
     try:
@@ -66,7 +67,7 @@ def main(namespace, packFormat, code):
             pack_format=packFormat)
 
         return json.dumps(transpiler.get_datapack_files())
-    except SyntaxError as e:
+    except RadonError as e:
         return str(e)
 
 main`)(namespace, packFormat * 1 || 48, code);

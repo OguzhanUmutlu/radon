@@ -48,9 +48,9 @@ class CplScore(CompileTimeValue):
         ctx.file.append(f"scoreboard players operation {self.location} *= FLOAT_PREC __temp__")
 
     def _force_int(self, ctx):  # ONLY USE THIS ON RECENTLY CACHED SCORES!
-        if self.unique_type == FLOAT_TYPE:
+        if self.unique_type == INT_TYPE:
             return
-        self.unique_type = FLOAT_TYPE
+        self.unique_type = INT_TYPE
         ctx.file.append(f"scoreboard players operation {self.location} /= FLOAT_PREC __temp__")
 
     def _force_type(self, ctx, type):  # ONLY USE THIS ON RECENTLY CACHED SCORES!
@@ -74,14 +74,15 @@ class CplScore(CompileTimeValue):
             f"scoreboard players operation {score_loc} = {self.location}"
         )
         score = CplScore(self.token, score_loc, self.unique_type.type)
-        if force_t == "int" or force_t == "float":
+        if force_t:
             score._force_type(ctx, force_t)
         return score
 
     def _call_index(self, ctx, index: str, arguments: List[CompileTimeValue], token):
         t = self.unique_type.type
         if index == "sqrt":
-            return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "isqrt" if t == "int" else "sqrt", [self], token)
+            return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "isqrt" if t == "int" else "sqrt", [self],
+                                                                         token)
         if index == "cbrt":
             return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "cbrt", [self], token)
         if index == "int":
@@ -214,43 +215,59 @@ class CplScore(CompileTimeValue):
     def _set_pow(self, ctx, cpl):
         if cpl.unique_type.type == "float":
             return None
-        return ctx._set(ctx, ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token))
+        return self._set(ctx,
+                         ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token))
 
     def _add(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             return self
-        return self.cache(ctx)._set_add(ctx, cpl)
+        c = self._cache(ctx)
+        if self.unique_type.type == "int" and cpl.unique_type.type == "float":
+            c._force_float(ctx)
+        return c._set_add(ctx, cpl)
 
     def _sub(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             return self
-        return self.cache(ctx)._set_sub(ctx, cpl)
+        c = self._cache(ctx)
+        if self.unique_type.type == "int" and cpl.unique_type.type == "float":
+            c._force_float(ctx)
+        return c._set_sub(ctx, cpl)
 
     def _mul(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             return cpl
         if cpl.is_lit_eq(1):
             return self
-        return self.cache(ctx)._set_mul(ctx, cpl)
+        c = self._cache(ctx)
+        if self.unique_type.type == "int" and cpl.unique_type.type == "float":
+            c._force_float(ctx)
+        return c._set_mul(ctx, cpl)
 
     def _div(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             raise_syntax_error("Divide by zero", self.token)
         if cpl.is_lit_eq(1):
             return cpl
-        return self.cache(ctx)._set_div(ctx, cpl)
-
-    def _pow(self, ctx, cpl):
-        if cpl.unique_type.type == "float":
-            return None
-        return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token)
+        c = self._cache(ctx)
+        if self.unique_type.type == "int" and cpl.unique_type.type == "float":
+            c._force_float(ctx)
+        return c._set_div(ctx, cpl)
 
     def _mod(self, ctx, cpl):
         if cpl.is_lit_eq(0):
             raise_syntax_error("Modulo by zero", self.token)
         if cpl.is_lit_eq(1) and self.unique_type.type == "int":
             return cpl
-        return self.cache(ctx)._set_mod(ctx, cpl)
+        c = self._cache(ctx)
+        if self.unique_type.type == "int" and cpl.unique_type.type == "float":
+            c._force_float(ctx)
+        return c._set_mod(ctx, cpl)
+
+    def _pow(self, ctx, cpl):
+        if cpl.unique_type.type == "float":
+            return None
+        return ctx.transpiler.builtin_vars["Math"].value._call_index(ctx, "ipow", [self, cpl], self.token)
 
     def _eq_neq(self, ctx, cpl, is_eq):
         return self._cmp(ctx, cpl, "==" if is_eq else "!=")
@@ -282,6 +299,14 @@ class CplScore(CompileTimeValue):
     def _and(self, ctx, cpl):
         if isinstance(cpl, CplSelector):
             return cpl._and(ctx, self)
+        if cpl.unique_type.type in {"array", "object"}:
+            return self
+        if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat) or isinstance(cpl, CplString):
+            if not cpl.value:
+                return CplInt(self.token, 0)
+            return self
+        if isinstance(cpl, CplNBT):
+            cpl = cpl.cache(ctx, force="score")
         eid = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
@@ -293,6 +318,14 @@ class CplScore(CompileTimeValue):
     def _or(self, ctx, cpl):
         if isinstance(cpl, CplSelector):
             return cpl._and(ctx, self)
+        if cpl.unique_type.type in {"array", "object"}:
+            return CplInt(self.token, 1)
+        if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat) or isinstance(cpl, CplString):
+            if cpl.value:
+                return CplInt(self.token, 1)
+            return self
+        if isinstance(cpl, CplNBT):
+            cpl = cpl.cache(ctx, force="score")
         eid = f"int_{get_uuid()} __temp__"
         ctx.file.append(f"scoreboard players set {eid} 0")
         ctx.file.append(f"execute "
@@ -306,20 +339,25 @@ class CplScore(CompileTimeValue):
     def tellraw_object(self, ctx):
         if self.unique_type.type == "int":
             ls = self.location.split(" ")
-            return ('{"score":{"name":"'
-                    + ls[0]
-                    + '","objective":"'
-                    + ls[1]
-                    + '"}}')
+            return {
+                "score": {
+                    "name": ls[0],
+                    "objective": ls[1]
+                }
+            }
         eid = get_uuid()
         ctx.file.append(
             f"execute store result storage temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
-        return '{"storage":"temp","nbt":"_' + str(eid) + '"}'
+        return {
+            "storage": "temp",
+            "nbt": f"_{eid}"
+        }
 
 
 from .float import CplFloat
 from .int import CplInt
-from .nbt import val_nbt
+from .nbt import val_nbt, CplNBT
 from .nbtfloat import CplFloatNBT
 from .nbtint import CplIntNBT
 from .selector import CplSelector
+from .string import CplString

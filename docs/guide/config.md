@@ -13,7 +13,8 @@ The default config is:
   "main": "src/main.rn",
   "data": "src/data",
   "outFolder": ".",
-  "useLock": false
+  "useLock": false,
+  "removeBeforeBuild": null
 }
 ```
 

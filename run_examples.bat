@@ -15,7 +15,7 @@ for /D %%d in (examples/*) do (
     )
 )
 
-python -m src.radon -d="%folders%"
+python -m src.radon -d="%folders%" -b
 
 popd
 endlocal

@@ -93,6 +93,10 @@ export default defineConfig({
                             link: "/guide/classes"
                         },
                         {
+                            text: "Enums",
+                            link: "/guide/enums"
+                        },
+                        {
                             text: "Importing",
                             link: "/guide/importing"
                         },

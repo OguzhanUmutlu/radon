@@ -2,7 +2,6 @@ from typing import Union
 
 from ._base import CompileTimeValue
 from .nbt import CplNBT
-from .score import CplScore
 from ..tokenizer import Token
 from ..utils import STRING_TYPE, get_uuid
 
@@ -60,3 +59,4 @@ class CplStringNBT(CplNBT):
 
 
 from .string import CplString
+from .score import CplScore

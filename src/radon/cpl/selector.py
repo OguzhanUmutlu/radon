@@ -31,7 +31,7 @@ class CplSelector(CompileTimeValue):
         raise_syntax_error("Selectors cannot be used in operations", self.token)
 
     def tellraw_object(self, ctx):
-        return '{"selector":"' + self.value + '"}'
+        return {"selector": self.value}
 
     def _and(self, ctx, cpl):
         if isinstance(cpl, CplInt) or isinstance(cpl, CplFloat):

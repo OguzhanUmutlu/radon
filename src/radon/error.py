@@ -1,3 +1,13 @@
+class RadonError(Exception):
+    def __init__(self, err, text, code, start, end):
+        super().__init__(err)
+        self.err = err
+        self.text = text
+        self.code = code
+        self.start = start
+        self.end = end
+
+
 def show_err(color, text, code, start, end):
     lines = code.split("\n")
 
@@ -7,18 +17,20 @@ def show_err(color, text, code, start, end):
     col_end = end - (code.rfind("\n", 0, end) + 1)
 
     if line_start == line_end:
+        ls = lines[line_start]
         lines[line_start] = (
-                lines[line_start][:col_start]
+                ls[:col_start]
                 + "\033[" + color + "m\033[4m"
-                + lines[line_start][col_start:col_end]
-                + "\033[0m"
-                + lines[line_start][col_end:]
+                + ls[col_start:col_end]
+                + "\033[0m" + "\033[" + color + "m"
+                + ls[col_end:]
         )
     else:
+        ls = lines[line_start]
         lines[line_start] = (
-                lines[line_start][:col_start]
+                ls[:col_start]
                 + "\033[" + color + "m\033[4m"
-                + lines[line_start][col_start:]
+                + ls[col_start:]
                 + "\033[0m"
         )
         for i in range(line_start + 1, line_end):
@@ -60,7 +72,9 @@ def raise_error(error, text, token):
 
 
 def raise_error_t(error, text, code, start, end):
-    raise SyntaxError(show_err("31", f"\n\033[31m{error}: {text}\033[0m", code, start, end))
+    raise RadonError(
+        show_err("31", f"\n\033[31m" + (f"{error}: " if error else "") + f"{text}\033[0m", code, start, end),
+        text, code, start, end)
 
 
 def show_warning(text, token):

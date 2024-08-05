@@ -1,5 +1,199 @@
 # Built-in features
 
+## print(selector, ...any)
+
+<details>
+<summary>Click to view</summary>
+
+Prints the given values to the given selector.
+
+</details>
+
+## printTitle(selector, ...any)
+
+<details>
+<summary>Click to view</summary>
+
+Prints the given values to the given selector as a title.
+
+</details>
+
+## printSubtitle(selector, ...any)
+
+<details>
+<summary>Click to view</summary>
+
+Prints the given values to the given selector as a subtitle.
+
+</details>
+
+## printActionbar(selector, ...any)
+
+<details>
+<summary>Click to view</summary>
+
+Prints the given values to the given selector as an actionbar message.
+
+</details>
+
+## Math
+
+<details>
+<summary>Click to view</summary>
+
+- Math.sqrt(int | float): float
+- Math.isqrt(int | float): int
+- Math.cbrt(int | float): float
+- Math.exp(int | float): float
+- Math.fastexp(int | float): float
+- Math.ipow(int | float, int): int | float
+- Math.sin(int | float): float
+- Math.cos(int | float): float
+- Math.tan(int | float): float
+- Math.arcsin(int | float): float
+- Math.arccos(int | float): float
+- Math.arctan(int | float): float
+- Math.fastarcsin(int | float): float
+- Math.fastarccos(int | float): float
+- Math.fastarctan(int | float): float
+- Math.factorial(int | float): int
+- Math.floor(int | float): int
+- Math.ceil(int | float): int
+- Math.round(int | float): int
+- Math.min(...(int | float)): int | float
+- Math.max(...(int | float)): int | float
+- Math.random(int min=1, int max=2147483647): int
+- Math.frandom(int min=1, int max=2147483647): float
+
+</details>
+
+## Formatting texts
+
+<details>
+
+<summary>Click to view</summary>
+
+In radon, you can print text to the chat using the `print()` function. Formatted texts allow you to make the output
+colored, underlined, bold etc. Here's a simple example that prints a red and bold text with the content `Hello, world!`:
+
+::: code-group
+
+```js
+print( fmt(red, bold, "Hello, world!") )
+```
+
+```mcfunction
+tellraw @a {"text":"Hello, world!","color":"red","bold":true}
+```
+
+:::
+
+To add text events like `click` or `hover` you can use the `.click` and `.hover` functions attached to the `fmt()`
+function call. Here's a simple example that redirects the player to Radon's documentation when they click on the text:
+
+::: code-group
+
+```js
+print(
+    fmt("Click me to view the Radon documentation!")
+        .click("open_url", "https://oguzhanumutlu.github.io/radon")
+        .hover("open_url", "https://oguzhanumutlu.github.io/radon")
+)
+```
+
+```mcfunction
+tellraw @a {"text":"Click me to view the Radon documentation!","clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"},"hoverEvent":{"action":"open_url","contents":"https://oguzhanumutlu.github.io/radon"}}
+```
+
+You can also add child text components by using the `.extend` function attached to the `fmt()` function call. Child
+components will inherit the style of the parent. Here's a simple example that prints a red `Hello` and a red
+bold `world`:
+
+::: code-group
+
+```js
+print(
+    fmt(red, "Hello, ")
+        .extend(
+            fmt(bold, "world!")
+        )
+)
+```
+
+```mcfunction
+tellraw @a {"text":"Hello, ","color":"red","extra":[{"text":"world!","bold":true}]}
+```
+
+:::
+
+Here's an example that includes everything that `fmt()` can offer:
+
+::: code-group
+
+```js
+print(
+    fmt(red, "Hello, ")
+        .extend(
+            fmt(bold, "world!")
+                .hover("open_url", "https://oguzhanumutlu.github.io/radon")
+                .click("open_url", "https://oguzhanumutlu.github.io/radon")
+        )
+)
+
+// Every style
+
+print(fmt(#123456, "Custom colored text"))
+print(fmt(black, "Black text"))
+print(fmt(dark_blue, "Dark blue text"))
+print(fmt(dark_green, "Dark green text"))
+print(fmt(dark_aqua, "Dark aqua text"))
+print(fmt(dark_red, "Dark red text"))
+print(fmt(dark_purple, "Dark purple text"))
+print(fmt(gold, "Gold text"))
+print(fmt(gray, "Gray text"))
+print(fmt(dark_gray, "Dark gray text"))
+print(fmt(blue, "Blue text"))
+print(fmt(green, "Green text"))
+print(fmt(aqua, "Aqua text"))
+print(fmt(red, "Red text"))
+print(fmt(light_purple, "Light purple text"))
+print(fmt(yellow, "Yellow text"))
+print(fmt(white, "White text"))
+print(fmt(bold, "Bold text"))
+print(fmt(italic, "Italic text"))
+print(fmt(underlined, "Underlined text"))
+print(fmt(strikethrough, "Strikethrough text"))
+print(fmt(obfuscated, "Obfuscated text"))
+```
+
+```mcfunction
+tellraw @a {"text":"Hello, ","color":"red","extra":[{"text":"world!","bold":true,"hoverEvent":{"action":"open_url","contents":"https://oguzhanumutlu.github.io/radon"},"clickEvent":{"action":"open_url","value":"https://oguzhanumutlu.github.io/radon"}}]}
+tellraw @a {"text":"Custom colored text","color":"#123456"}
+tellraw @a {"text":"Black text","color":"black"}
+tellraw @a {"text":"Dark blue text","color":"dark_blue"}
+tellraw @a {"text":"Dark green text","color":"dark_green"}
+tellraw @a {"text":"Dark aqua text","color":"dark_aqua"}
+tellraw @a {"text":"Dark red text","color":"dark_red"}
+tellraw @a {"text":"Dark purple text","color":"dark_purple"}
+tellraw @a {"text":"Gold text","color":"gold"}
+tellraw @a {"text":"Gray text","color":"gray"}
+tellraw @a {"text":"Dark gray text","color":"dark_gray"}
+tellraw @a {"text":"Blue text","color":"blue"}
+tellraw @a {"text":"Green text","color":"green"}
+tellraw @a {"text":"Aqua text","color":"aqua"}
+tellraw @a {"text":"Red text","color":"red"}
+tellraw @a {"text":"Light purple text","color":"light_purple"}
+tellraw @a {"text":"Yellow text","color":"yellow"}
+tellraw @a {"text":"White text","color":"white"}
+tellraw @a {"text":"Bold text","bold":true}
+tellraw @a {"text":"Italic text","italic":true}
+tellraw @a {"text":"Underlined text","underlined":true}
+tellraw @a {"text":"Strikethrough text","strikethrough":true}
+tellraw @a {"text":"Obfuscated text","obfuscated":true}
+```
+
+</details>
+
 ## Listener.on("firstJoin", callback)
 
 <details>
@@ -148,36 +342,6 @@ as @p positioned 10 5 4 facing 8 5 2 {
 
 </details>
 
-## Math
-
-<details>
-<summary>Click to view</summary>
-
-- Math.sqrt(int | float): float
-- Math.isqrt(int | float): int
-- Math.cbrt(int | float): float
-- Math.exp(int | float): float
-- Math.fastexp(int | float): float
-- Math.ipow(int | float, int): int | float
-- Math.sin(int | float): float
-- Math.cos(int | float): float
-- Math.tan(int | float): float
-- Math.arcsin(int | float): float
-- Math.arccos(int | float): float
-- Math.arctan(int | float): float
-- Math.fastarcsin(int | float): float
-- Math.fastarccos(int | float): float
-- Math.fastarctan(int | float): float
-- Math.floor(int | float): int
-- Math.ceil(int | float): int
-- Math.round(int | float): int
-- Math.min(...(int | float)): int | float
-- Math.max(...(int | float)): int | float
-- Math.random(int min=1, int max=2147483647): int
-- Math.frandom(int min=1, int max=2147483647): float
-
-</details>
-
 ## Data.get(type, location)
 
 <details>
@@ -241,39 +405,6 @@ Data.merge(@s.attributes, [{"id": "minecraft:generic.movement_speed", "base": 0.
 
 </details>
 
-## vset(expression, value)
-
-<details>
-<summary>Click to view</summary>
-
-Sets the value of a variable. Allows macros.
-
-Examples:
-
-```js
-a = 10
-b = 3
-vset(a, $(b + 10)$(b + 5))
-```
-
-</details>
-
-## mset(expression, data location)
-
-<details>
-<summary>Click to view</summary>
-
-Sets the value of a variable from a data location. Allows macros.
-
-Examples:
-
-```js
-a = 10
-mset(a, player_storage points."$(@s.UUID)")
-```
-
-</details>
-
 ## Recipe.add(object)
 
 <details>
@@ -282,42 +413,6 @@ mset(a, player_storage points."$(@s.UUID)")
 :::warning
 This is a macro function, so it will run in compile time and bypass flow controls.
 :::
-
-</details>
-
-## print(selector, ...any)
-
-<details>
-<summary>Click to view</summary>
-
-Prints the given values to the given selector.
-
-</details>
-
-## printTitle(selector, ...any)
-
-<details>
-<summary>Click to view</summary>
-
-Prints the given values to the given selector as a title.
-
-</details>
-
-## printSubtitle(selector, ...any)
-
-<details>
-<summary>Click to view</summary>
-
-Prints the given values to the given selector as a subtitle.
-
-</details>
-
-## printActionbar(selector, ...any)
-
-<details>
-<summary>Click to view</summary>
-
-Prints the given values to the given selector as an actionbar message.
 
 </details>
 
@@ -421,5 +516,58 @@ Macro for 0.
 <summary>Click to view</summary>
 
 Macro for 0.
+
+</details>
+
+## vset(expression, value)
+
+<details>
+<summary>Click to view</summary>
+
+Sets the value of a variable. Allows macros.
+
+Examples:
+
+```js
+a = 10
+b = 3
+vset(a, $(b + 10)$(b + 5))
+```
+
+</details>
+
+## mset(expression, data location)
+
+<details>
+<summary>Click to view</summary>
+
+Sets the value of a variable from a data location. Allows macros.
+
+Examples:
+
+```js
+a = 10
+mset(a, player_storage points."$(@s.UUID)")
+```
+
+</details>
+
+## mstr(macro)
+
+<details>
+<summary>Click to view</summary>
+
+Gives the result of the given input as a string using vanilla macros.
+
+Examples:
+
+```js
+b = 10
+c = 20
+d = "hello!"
+
+result = mstr(b is: $(b), c is: $(c), d is: $(d))
+// result = "b is: 10, c is: 20, d is: hello!"
+```
 
 </details>

@@ -45,4 +45,4 @@ class CplTuple(CompileTimeValue):
         return None
 
     def tellraw_object(self, ctx):
-        return json.dumps(self._py_val)
+        return {"text": json.dumps(self._py_val)}

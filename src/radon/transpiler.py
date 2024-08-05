@@ -24,9 +24,9 @@ from .dp_ast import (
     COMMANDS,
     chain_tokens,
     make_expr,
-    parse_str, parse
+    parse_str, parse, DefineEnumStatement
 )
-from .error import raise_syntax_error, raise_syntax_error_t, show_warning, raise_error
+from .error import raise_syntax_error, raise_syntax_error_t, show_warning, raise_error, RadonError
 from .nbt_definitions import ENTITIES_OBJ
 from .tokenizer import (
     BlockIdentifierToken,
@@ -310,10 +310,10 @@ def get_module_attr(module):
 
 
 # add lib
-from .builtin import lmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, \
+from .builtin import rmath, print as _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, \
     data
 
-_ = [lmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, data]
+_ = [rmath, _no, pyeval, time, swap, stdvar, listener, exit, recipe, success, raycast, getpos, data]
 
 
 def get_fn_macro_obj(ctx: TranspilerContext):
@@ -327,7 +327,7 @@ def get_fn_macro_obj(ctx: TranspilerContext):
             d.append(f"'{arg.name}':'$({arg.name})'")
     if not has_macro:
         return ""
-    return "{" + ",".join(d) + "}"
+    return " {" + ",".join(d) + "}"
 
 
 class Transpiler:
@@ -434,6 +434,16 @@ class Transpiler:
             dp_files[f"data/{self.pack_namespace}/{f}"] = self.dp_files[f]
         return dp_files
 
+    def get_literal_num(self, num):
+        isf = isinstance(num, float)
+        if isf:
+            num = int(num * FLOAT_PREC)
+        k = f"literal_num_{num}"
+        if k not in self.data:
+            self.data[k] = True
+            self.load_file.append(f"scoreboard players set literal_{num} __temp__ {num}")
+        return CplScore(None, f"literal_{num}", "float" if isf else "int")
+
     def get_temp_file_name(self, content: str | List[str]):
         if isinstance(content, list):
             content = "\n".join(content)
@@ -496,6 +506,19 @@ class Transpiler:
         return None
 
     def _transpile_statement(self, ctx: TranspilerContext, statement: Statement):
+        if isinstance(statement, DefineEnumStatement):
+            values = {}
+            for k in statement.values:
+                v = statement.values[k]
+                if isinstance(v, int):
+                    values[k] = CplInt(None, v)
+                elif isinstance(v, float):
+                    values[k] = CplFloat(None, v)
+                else:
+                    values[k] = CplString(None, v)
+            self.variables[statement.name.value] = VariableDeclaration(
+                statement.name.value, CplObject(None, values), True)
+            return
         if isinstance(statement, DefineClassStatement):
             if ctx.function or ctx.loop:
                 raise_syntax_error(
@@ -709,7 +732,7 @@ class Transpiler:
                 if_cmd = f"execute if entity {resp.value} run "
                 unless_cmd = f"execute unless entity {resp.value} run "
             else:
-                raise SyntaxError("Invalid condition")
+                raise "Invalid condition"
             has_one = (has_if or has_else) and (not has_if or not has_else)
             if has_one:
                 one_body = statement.body if has_if else statement.elseBody
@@ -774,7 +797,7 @@ class Transpiler:
             )
             if ret is None:
                 raise_syntax_error("Invalid return type for a function", statement)
-                raise SyntaxError("")
+                assert False
             is_class_init = fn_name == ctx.class_name
             ret_loc = ret
             if isinstance(ret_loc, CplDef):
@@ -890,7 +913,7 @@ class Transpiler:
             type_v = cpl_def_from_tokens(self.classes, statement.varType)
             if not type_v:
                 raise_syntax_error(f"Invalid type", statement)
-                raise SyntaxError("")
+                assert False
             self.variables[name] = VariableDeclaration(name, type_v, False)
             self.load_file.append(
                 f'scoreboard objectives add {name} dummy "{name}"'
@@ -901,13 +924,19 @@ class Transpiler:
             return True
         if isinstance(statement, ExecuteMacroStatement):
             exec_name = self._run_safe("__execute__", statement.body, ctx)
-            cmd_str, has_repl = self.proc_cmd(ctx, statement.command)
+            cmd_str, has_repl = self.proc_cmd(ctx, statement.command, statement)
+            mac = get_fn_macro_obj(ctx)
             if has_repl:
                 fid = f"__execute__/{get_uuid()}"
-                self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}"]
+                self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}"]
+                if mac:
+                    for arg in ctx.function.arguments:
+                        if arg.store_via == "macro":
+                            ctx.file.append(f"$data modify storage cmd_mem {arg.name} set value '$({arg.name})'")
                 ctx.file.append(f"function {self.pack_namespace}:{fid} with storage cmd_mem")
             else:
-                ctx.file.append(f"execute {cmd_str} run function {self.pack_namespace}:{exec_name}")
+                ctx.file.append(
+                    f"{'$' if mac else ''}execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}")
             _return_safe(ctx)
             return True
         raise_syntax_error("Invalid statement", statement)
@@ -922,16 +951,33 @@ class Transpiler:
         new_file = []
         loop = ctx.loop
         if isinstance(loop, LoopStatement):
+            st = loop
             mac = get_fn_macro_obj(ctx)
             continue_ = f"{'$' if mac else ''}function {self.pack_namespace}:{file_name}" + mac
-            if loop.time:
-                continue_ = f"schedule function {self.pack_namespace}:{file_name} {loop.time.value} replace"
+            if st.time:
+                if mac:
+                    raise_syntax_error(
+                        "Cannot use timed loops inside macro functions, move the loop into a normal function and run it there.",
+                        st.time)
+                continue_ = f"schedule function {self.pack_namespace}:{file_name} {st.time.value} replace"
             loop = LoopDeclaration(
                 eid=eid,
                 file=new_file,
                 file_path=file_name,
                 continue_=continue_
             )
+            if st.step:
+                step_name = f"__loop__/__step__/{get_uuid()}"
+                loop.continue_ = f"{'$' if mac else ''}function {self.pack_namespace}:{step_name}{mac}"
+                self.files[step_name] = []
+                self._transpile(TranspilerContext(
+                    transpiler=self,
+                    file_name=step_name,
+                    file=self.files[step_name],
+                    radon_path=ctx.radon_path,
+                    function=ctx.function,
+                    loop=loop), st.step)
+                self.files[step_name].append(continue_)
             self.loops[eid] = loop
         self.files[file_name] = new_file
         self._transpile(
@@ -958,7 +1004,7 @@ class Transpiler:
             arg_type_parsed = cpl_def_from_tokens(self.classes, arg[0])
             if arg_type_parsed is None:
                 raise_syntax_error("Invalid argument type for a function", arg[0][0])
-                raise SyntaxError("")
+                assert False
             arg_name = arg[1][0].value
             if arg_name in arg_names:
                 raise_syntax_error("Argument name is already used", arg[1][0])
@@ -977,7 +1023,7 @@ class Transpiler:
             )
         return arguments
 
-    def proc_cmd(self, ctx: TranspilerContext, cmd: str):
+    def proc_cmd(self, ctx: TranspilerContext, cmd: str, base):
         cmd_str = ""
         i = 0
         has_repl = False
@@ -1023,7 +1069,12 @@ class Transpiler:
                 repl = cmd[fp + 1: i]
                 (expr_tokens, _) = tokenize(repl)
                 expr_tokens = expr_tokens[:-1]
-                val = self.tokens_to_cpl(ctx, expr_tokens)
+                try:
+                    val = self.tokens_to_cpl(ctx, expr_tokens)
+                except RadonError as e:
+                    raise_syntax_error(e.text,
+                                       Token(base.code, TokenType.POINTER, base.start + si, base.start + i))
+                    raise e
 
                 if cmd[si + 1] == "(":
                     cmd_str += f"$(_{repl_i})"
@@ -1035,15 +1086,15 @@ class Transpiler:
                     repl_i += 1
 
                 elif cmd[si + 1] == "s":
-                    cmd_str += val.tellraw_object(ctx)
+                    cmd_str += val.tellraw_object_str(ctx)
                 elif cmd[si + 1:si + 1] == "ds":
                     py_val = val.get_py_value()
                     if py_val is not None:
                         cmd_str += str(py_val)
                     else:
-                        cmd_str += val.tellraw_object(ctx)
+                        cmd_str += val.tellraw_object_str(ctx)
                 elif cmd[si + 1] == "j":
-                    cmd_str += json.dumps(val.tellraw_object(ctx))
+                    cmd_str += val.tellraw_object_str(ctx)
                 elif cmd[si + 1:si + 2] == "da":
                     cmd_str += val.get_data_str(ctx)
                 elif cmd[si + 1] == "l":
@@ -1061,7 +1112,7 @@ class Transpiler:
     def run_cmd(self, ctx: TranspilerContext, pointer: Token, score_loc=None, type="result") -> CompileTimeValue:
         file = ctx.file
         cmd = pointer.value
-        cmd_str, has_repl = self.proc_cmd(ctx, cmd)
+        cmd_str, has_repl = self.proc_cmd(ctx, cmd, pointer)
 
         eid = score_loc or "int_" + str(get_uuid()) + " __temp__"
         eid_val = CplScore(pointer, eid, "int")
@@ -1080,7 +1131,7 @@ class Transpiler:
             cmd_id = get_uuid()
             file_name = f"__cmd__/{cmd_id}"
         self.files[file_name] = cmd_file
-        cmd_file.append("$" + cmd_str)
+        cmd_file.append("$return run " + cmd_str)
         file.append(
             f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage cmd_mem"
         )
@@ -1105,7 +1156,7 @@ class Transpiler:
                     raise_syntax_error(
                         f"Block identifier's position has to have 3 literal numbers", token
                     )
-                    raise SyntaxError("")
+                    assert False
                 pos.append(sym + str(cpl.value))
             return f"block {' '.join(pos)} {token.name.value}"
         raise ValueError("Invalid token")
@@ -1183,15 +1234,15 @@ class Transpiler:
                 score_loc=f"{name} global",
                 nbt_loc=f"storage variables {name}",
             )
-        raise SyntaxError("")
+        assert False
 
     def variable_token_to_cpl(
             self, ctx: TranspilerContext, t: Token
     ) -> CompileTimeValue:
         res = self._var_to_cpl_or_none(ctx, t)
         if res is None:
-            raise_syntax_error("Variable not found", t)
-            raise SyntaxError("")
+            raise_syntax_error(f"Variable '{t.value}' was not found", t)
+            assert False
         return res
 
     def chain_to_cpl(self, ctx: TranspilerContext, t: List[Token]) -> CompileTimeValue:
@@ -1239,7 +1290,7 @@ class Transpiler:
                     cpl = cpl.call_index(ctx, token.func.value, token, token)
                     continue
                 if token.open.value == "(":
-                    cpl = cpl.call(ctx, self.arg_tokens_to_cpl(ctx, token.children), token)
+                    cpl = cpl.call(ctx, token, token)
                     continue
             raise_syntax_error(f"Cannot index with the token", token)
         return cpl
@@ -1273,7 +1324,7 @@ class Transpiler:
         if isinstance(t, GroupToken) and t.func:
             return self.run_function(ctx, t)
         if isinstance(t, GroupToken) and t.open.value == "(":
-            return self.tokens_to_cpl(ctx, t.children)
+            return t.cpl(ctx)
         if isinstance(t, GroupToken) and t.open.value == "[":
             if len(t.children) == 0:
                 return CplTuple(t, [])
@@ -1400,7 +1451,7 @@ class Transpiler:
 
             if is_init:
                 if t1[0].value != "=" or len(t0) != 1:
-                    raise_syntax_error("Variable not found", t0[0])
+                    raise_syntax_error(f"Variable '{t0[0].value}' was not found", t0[0])
                 if t0[0] == "this":
                     raise_syntax_error("Cannot assign 'this' keyword to something", t0[0])
 
@@ -1468,6 +1519,8 @@ class Transpiler:
                 continue
 
             right = stack.pop()
+            if len(stack) == 0:
+                raise_syntax_error("Expected a value after an operator", chain[0])
             left = stack.pop()
 
             score = left.compute(ctx, chain[0].value, right, t0[0])
@@ -1495,7 +1548,13 @@ class Transpiler:
         exists_fn = self.fn_exists(name)
 
         if not exists_fn and name not in builtin_fns:
-            raise_syntax_error("Undefined function", base)
+            for var in builtin_vars:
+                val = builtin_vars[var].value
+                if isinstance(val, CustomCplObject):
+                    if name in val.obj:
+                        raise_syntax_error(f"Undefined function. Did you mean to use built-in function {var}.{name}()?",
+                                           base)
+            raise_syntax_error(f"Undefined function: {name}", base)
             return CplInt(base, 0)
 
         if name not in self.classes and not exists_fn and name in builtin_fns:
@@ -1516,9 +1575,11 @@ class Transpiler:
                 if exists_fn.function.__code__.co_argcount == 2:
                     return exists_fn.function(ctx, args) or CplInt(base, 0)
                 return exists_fn.function(ctx, args, base)
+            except RadonError as e:
+                raise e
             except Exception as _:
                 stack_trace = traceback.format_exc()
-                raise SyntaxError(stack_trace)
+                raise Exception(stack_trace)
 
         found_fn = None
         available = []
@@ -1530,7 +1591,7 @@ class Transpiler:
                     break
         if found_fn is None:
             raise_syntax_error(f"Invalid arguments. Available usages:\n{'\n'.join(available)}", base)
-            raise SyntaxError("")
+            assert False
 
         returns = found_fn.returns
         fn_args = found_fn.arguments
@@ -1546,8 +1607,8 @@ class Transpiler:
             if arg.store_via == "stack":
                 if isinstance(val, CplScore):
                     ctx.file.append(
-                        f"data modify {store_at.location} append value {store_at.unique_type.get_sample_value()}")
-                    val.cache(ctx, f"{store_at.location}[-1]")
+                        f"data modify {store_at.location} append value {store_at.unique_type.content.get_sample_value()}")
+                    val.cache(ctx, nbt_loc=f"{store_at.location}[-1]", force="nbt")
                 else:
                     ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
             elif arg.store_via == "macro":
@@ -1650,8 +1711,13 @@ def _return_safe(ctx: TranspilerContext):
             ctx.file.append(
                 f"execute if score __break__{ctx.loop.eid} __temp__ matches 1..1 run return 0"
             )
+            cou = ctx.loop.continue_
+            mac = ""
+            if cou[0] == "$":
+                mac = "$"
+                cou = cou[1:]
             ctx.file.append(
-                f"execute if score __continue__{ctx.loop.eid} __temp__ matches 1..1 run return run {ctx.loop.continue_}"
+                f"{mac}execute if score __continue__{ctx.loop.eid} __temp__ matches 1..1 run return run {cou}"
             )
         else:
             ctx.file.append(

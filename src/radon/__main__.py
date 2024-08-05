@@ -9,6 +9,7 @@ from time import sleep, time
 from typing import Any
 
 from .dp_ast import parse_str
+from .error import RadonError
 from .transpiler import Transpiler
 from .utils import VERSION_RADON, get_pack_format
 
@@ -114,7 +115,7 @@ def build_dir():
             main_dir=config["main"] + "/../",
             main_file_path=config["main"],
             debug_mode=args.b)
-    except SyntaxError as e:
+    except RadonError as e:
         return str(e)
     except Exception as e:
         raise e
@@ -136,20 +137,29 @@ def build_dir():
     rm_files = lock.split("\n") if lock else []
 
     for out_folder in out_folders:
+        bef = os.getcwd()
+        os.chdir(out_folder)
         if config["useLock"]:
             for f in rm_files:
-                f = f"{out_folder}/{f}"
                 if not path.exists(f):
                     continue
                 if path.isfile(f):
                     os.remove(f)
                 dr = path.dirname(f)
                 empty_dir_recursive(dr)
+        elif config["removeBeforeBuild"] is not None:
+            for f in config["removeBeforeBuild"]:
+                if path.exists(f):
+                    if path.isfile(f):
+                        os.remove(f)
+                    else:
+                        shutil.rmtree(f, ignore_errors=True)
         else:
-            shutil.rmtree(out_folder + "/data", ignore_errors=True)
-            if path.exists(out_folder + "/pack.mcmeta"):
-                os.remove(out_folder + "/pack.mcmeta")
-            os.makedirs(out_folder + "/data", exist_ok=True)
+            shutil.rmtree("data", ignore_errors=True)
+            if path.exists("pack.mcmeta"):
+                os.remove("pack.mcmeta")
+            os.makedirs("data", exist_ok=True)
+        os.chdir(bef)
 
     for out_folder in out_folders:
         if "data" in config and path.exists(config["data"]) and path.isdir(config["data"]):
@@ -215,6 +225,7 @@ def init_dir():
                     "data": pack_data,
                     "outFolder": pack_output_folder,
                     "useLock": False,
+                    "removeBeforeBuild": None
                 },
                 indent=2,
             )
