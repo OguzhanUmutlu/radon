@@ -49,6 +49,14 @@ class CplString(CplLiteral):
             if len(arguments) > 0:
                 return 0
             return self
+        if index == "substr":
+            if len(arguments) != 2:
+                return 2
+            arg0 = arguments[0]
+            arg1 = arguments[1]
+            if not isinstance(arg0, CplInt) or not isinstance(arg1, CplInt):
+                return self._cache(ctx)._call_index(ctx, index, arguments, token)
+            return CplString(self.token, self.value[arg0.value:arg1.value])
         return None
 
     def _add(self, ctx, cpl):

@@ -932,7 +932,7 @@ class Transpiler:
                 self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}"]
                 for arg in ctx.function.arguments:
                     if arg.store_via == "macro":
-                        ctx.file.append("data modify temp _cmd_mem set value {}")
+                        ctx.file.append("data modify storage temp _cmd_mem set value {}")
                         break
                 if mac:
                     for arg in ctx.function.arguments:
@@ -1639,7 +1639,7 @@ class Transpiler:
 
         if found_fn.type == "radon":
             ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
-                f" with storage temp _fn_args_macro {found_fn.id}" if has_any_macro_argument else ""
+                f" with storage temp _fn_args_macro.{found_fn.id}" if has_any_macro_argument else ""
             ))
             for index, arg in enumerate(fn_args):
                 if arg.store_via == "stack":

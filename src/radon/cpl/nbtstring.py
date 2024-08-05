@@ -2,6 +2,7 @@ from typing import Union
 
 from ._base import CompileTimeValue
 from .nbt import CplNBT
+from ..error import raise_syntax_error
 from ..tokenizer import Token
 from ..utils import STRING_TYPE, get_uuid
 
@@ -15,6 +16,23 @@ class CplStringNBT(CplNBT):
             eid = f"int_{get_uuid()} __temp__"
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
+        return None
+
+    def _call_index(self, ctx, index, arguments, token):
+        if index == "toString":
+            if len(arguments) > 0:
+                return 0
+            return self
+        if index == "substr":
+            if len(arguments) != 2:
+                return 2
+            arg0 = arguments[0]
+            arg1 = arguments[1]
+            if not isinstance(arg0, CplInt) or not isinstance(arg1, CplInt):
+                raise_syntax_error("Not implemented", token)
+            res = CplStringNBT(self.token, f"storage temp _{get_uuid()}")
+            ctx.file.append(f"data modify {res.location} set string {self.location} {arg0.value} {arg1.value}")
+            return res
         return None
 
     def _set_add(self, ctx, cpl):
@@ -59,4 +77,5 @@ class CplStringNBT(CplNBT):
 
 
 from .string import CplString
+from .int import CplInt
 from .score import CplScore

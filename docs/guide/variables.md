@@ -122,6 +122,7 @@ f = a.float() // Gives itself
 
 myStr = "hello"
 myStrLen = myStr.length
+myStrEll = myStr.substr(1, -1) // Gives "ell"
 
 myArr = [1, 2, 3]
 myArr.push(4)
@@ -132,17 +133,16 @@ myArrLen = myArr.length
 
 ```mcfunction [mcfunction]
 scoreboard players set a global 5640
-scoreboard players operation sqrt_0 __temp__ = a global
-scoreboard players operation __sqrt__x __temp__ /= __sqrt__4 __temp__
+scoreboard players operation __sqrt__x __temp__ = a global
 scoreboard players operation __sqrt__output __temp__ = __sqrt__x __temp__
-function namespace_here:__lib__/__sqrt__loop
-scoreboard players operation b global = null global
+function radon:__lib__/sqrt_loop
+scoreboard players operation b global = __sqrt__output __temp__
 scoreboard players set c global 2374
-scoreboard players operation cbrt_0 __temp__ = a global
+scoreboard players operation __cbrt__x __temp__ = a global
 scoreboard players operation __cbrt__x __temp__ *= __cbrt__4d3 __temp__
 scoreboard players operation __cbrt__output __temp__ = __cbrt__x __temp__
-function namespace_here:__lib__/__cbrt__loop
-scoreboard players operation d global = null global
+function radon:__lib__/__cbrt__loop
+scoreboard players operation d global = __cbrt__output __temp__
 scoreboard players operation int_1 __temp__ = a global
 scoreboard players operation int_1 __temp__ /= FLOAT_PREC __temp__
 scoreboard players operation e global = int_1 __temp__
@@ -150,12 +150,14 @@ scoreboard players operation f global = a global
 data modify storage variables myStr set value "hello"
 execute store result score int_2 __temp__ run data get storage variables myStr
 scoreboard players operation myStrLen global = int_2 __temp__
+data modify storage temp _3 set string storage variables myStr 1 -1
+data modify storage variables myStrEll set from storage temp _3
 data modify storage variables myArr set value [1, 2, 3]
 data modify storage variables myArr append value 4
 data remove storage variables myArr[-1]
 data modify storage variables myArr insert 0 value 5
-execute store result score int_5 __temp__ run data get storage variables myArr
-scoreboard players operation myArrLen global = int_5 __temp__
+execute store result score int_6 __temp__ run data get storage variables myArr
+scoreboard players operation myArrLen global = int_6 __temp__
 ```
 
 :::

@@ -11,6 +11,10 @@ ENTITIES_OBJ = obj({})
 BLOCKS_Properties = obj({})  # TODO: this
 
 ITEMS__Tag = obj({"Damage": INT_TYPE})  # Not finished
+ITEMS__SoundEvent = obj({"sound_id": STRING_TYPE, "range": FLOAT_TYPE})
+ITEMS__AttributeModifier = obj(
+    {"type": STRING_TYPE, "slot": STRING_TYPE, "id": STRING_TYPE, "amount": INT_TYPE, "operation": STRING_TYPE})
+ITEMS__components = obj({})
 ITEMS__Attribute = obj(
     {"AttributeName": STRING_TYPE, "Amount": FLOAT_TYPE, "Slot": STRING_TYPE, "Operation": INT_TYPE,
      "UUID": UUID_TYPE})
@@ -22,7 +26,8 @@ ENTITIES__ActiveEffect = obj(
 ENTITIES__AttributeModifier = obj({"Name": STRING_TYPE, "Amount": FLOAT_TYPE, "Operation": INT_TYPE, "UUID": UUID_TYPE})
 ENTITIES__Attribute = obj({"name": STRING_TYPE, "Base": FLOAT_TYPE, "Modifiers": arr(ENTITIES__AttributeModifier)})
 
-ITEMS_Item = obj({"id": STRING_TYPE, "Count": INT_TYPE, "tag": ITEMS__Tag})
+ITEMS_Item = obj(
+    {"id": STRING_TYPE, "Count": INT_TYPE, "count": INT_TYPE, "tag": ITEMS__Tag, "components": ITEMS__components})
 ITEMS_Enchantments = arr(obj({"id": STRING_TYPE, "lvl": INT_TYPE}))
 ITEMS_StoredEnchantments = ITEMS_Enchantments
 ITEMS_EntityTag = ENTITIES_OBJ
@@ -44,6 +49,147 @@ ITEMS_Fireworks = obj({"Explosions": arr(ITEMS__FireworkExplosion), "Flight": IN
 ITEMS_CanPlaceOn = STRING_ARRAY_TYPE
 ITEMS_BlockEntityTag = obj({})  # Not finished
 ITEMS_BlockStateTag = obj({"facing": STRING_TYPE, "half": STRING_TYPE, "shape": STRING_TYPE})
+
+ITEMS__components.content.update({
+    "minecraft:attribute_modifiers": obj({
+        "modifiers": arr(ITEMS__AttributeModifier),
+        "show_in_tooltip": INT_TYPE
+    }),
+    "minecraft:banner_patterns": arr(obj({
+        "pattern": STRING_TYPE,
+        "color": STRING_TYPE
+    })),
+    "minecraft:base_color": STRING_TYPE,
+    "minecraft:bees": arr(obj({
+        "entity_data": ENTITIES_OBJ,
+        "min_ticks_in_hive": INT_TYPE,
+        "ticks_in_hive": INT_TYPE
+    })),
+    "minecraft:block_entity_data": BLOCKS_Properties,
+    "minecraft:block_state": BLOCKS_Properties,
+    "minecraft:bucket_entity_data": ENTITIES_OBJ,
+    "minecraft:bundle_contents": arr(ITEMS_Item),
+    "minecraft:can_break": obj({"blocks": arr(STRING_TYPE)}),
+    "minecraft:can_place_on": obj({"blocks": arr(STRING_TYPE)}),
+    "minecraft:charged_projectiles": arr(ITEMS_Item),
+    "minecraft:container": arr(obj({"slot": INT_TYPE, "item": ITEMS_Item})),
+    "minecraft:container_loot": obj({"loot_table": STRING_TYPE, "seed": INT_TYPE}),
+    # Skipping minecraft:custom_data
+    "minecraft:custom_model_data": INT_TYPE,
+    "minecraft:custom_name": STRING_TYPE,
+    "minecraft:damage": INT_TYPE,
+    # "minecraft:debug_stick_state":, this is not documented??
+    "minecraft:dyed_color": obj({"rgb": INT_TYPE, "show_in_tooltip": INT_TYPE}),
+    "minecraft:enchantment_glint_override": INT_TYPE,
+    "minecraft:enchantments": arr(ITEMS_Enchantments),
+    "minecraft:entity_data": ENTITIES_OBJ,
+    "minecraft:fire_resistant": obj({}),
+    "minecraft:firework_explosion": obj({
+        "shape": STRING_TYPE,
+        "colors": INT_ARRAY_TYPE,
+        "fade_colors": INT_ARRAY_TYPE,
+        "has_trail": INT_TYPE,
+        "has_twinkle": INT_TYPE
+    }),
+    "minecraft:fireworks": obj({
+        "explosions": arr(ITEMS__FireworkExplosion),
+        "flight_duration": INT_TYPE
+    }),
+    "minecraft:food": obj({
+        "nutrition": INT_TYPE,
+        "saturation": FLOAT_TYPE,
+        "can_always_eat": INT_TYPE,
+        "using_converts_to": ITEMS_Item,
+        "effects": arr(obj({
+            "effect": ENTITIES__ActiveEffect,
+            "probability": FLOAT_TYPE
+        }))
+    }),
+    "minecraft:hide_additional_tooltip": obj({}),
+    "minecraft:hide_tooltip": obj({}),
+    "minecraft:instrument": obj({
+        "sound_event": ITEMS__SoundEvent,
+        "use_duration": INT_TYPE,
+        "range": FLOAT_TYPE
+    }),
+    "minecraft:intangible_projectile": obj({}),
+    "minecraft:item_name": STRING_TYPE,
+    "minecraft:jukebox_playable": obj({
+        "song": STRING_TYPE,
+        "show_in_tooltip": INT_TYPE
+    }),
+    "minecraft:lock": STRING_TYPE,
+    "minecraft:lodestone_tracker": obj({
+        "target": obj({
+            "pos": INT_ARRAY_TYPE,
+            "dimension": STRING_TYPE
+        }),
+        "tracked": INT_TYPE
+    }),
+    "minecraft:lore": STRING_ARRAY_TYPE,
+    "minecraft:map_color": INT_TYPE,
+    "minecraft:map_decorations": obj({
+        "type": STRING_TYPE,
+        "x": FLOAT_TYPE,
+        "z": FLOAT_TYPE,
+        "rotation": FLOAT_TYPE
+    }),
+    "minecraft:map_id": INT_TYPE,
+    "minecraft:max_damage": INT_TYPE,
+    "minecraft:max_stack_size": INT_TYPE,
+    "minecraft:note_block_sound": STRING_TYPE,
+    "minecraft:ominous_bottle_amplifier": INT_TYPE,
+    "minecraft:pot_decorations": arr(STRING_TYPE),
+    "minecraft:potion_contents": arr(obj({
+        "potion": STRING_TYPE,
+        "custom_color": INT_TYPE,
+        "custom_effects": arr(ENTITIES__ActiveEffect)
+    })),
+    "minecraft:profile": obj({
+        "name": STRING_TYPE,
+        "id": INT_ARRAY_TYPE,
+        "properties": arr(obj({
+            "name": STRING_TYPE,
+            "value": STRING_TYPE,
+            "signature": STRING_TYPE
+        }))
+    }),
+    "minecraft:rarity": STRING_TYPE,
+    "minecraft:recipes": STRING_ARRAY_TYPE,
+    "minecraft:recipe_cost": INT_TYPE,
+    "minecraft:stored_enchantments": arr(ITEMS_Enchantments),
+    "minecraft:suspicious_stew_effects": arr(ENTITIES__ActiveEffect),
+    "minecraft:tool": obj({
+        "default_mining_speed": FLOAT_TYPE,
+        "damage_per_block": INT_TYPE,
+        "rules": arr(obj({
+            "blocks": STRING_ARRAY_TYPE,
+            "speed": FLOAT_ARRAY_TYPE,
+            "correct_for_drops": INT_TYPE
+        }))
+    }),
+    "minecraft:writable_book_content": obj({
+        "pages": arr(obj({
+            "raw": STRING_TYPE,
+            "filtered": STRING_TYPE
+        }))
+    }),
+    "minecraft:written_book_content": obj({
+        "pages": arr(obj({
+            "raw": STRING_TYPE,
+            "filtered": STRING_TYPE
+        })),
+        "title": obj({
+            "raw": STRING_TYPE,
+            "filtered": STRING_TYPE
+        }),
+        "author": STRING_TYPE,
+        "generation": INT_TYPE,
+        "resolved": INT_TYPE
+    }),
+    "minecraft:creative_slot_lock": obj({}),
+    "minecraft:map_post_processing": INT_TYPE
+})
 
 # Entities
 ENTITIES_UUID = UUID_TYPE
