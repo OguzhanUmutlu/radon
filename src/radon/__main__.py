@@ -302,7 +302,7 @@ def main():
     global files_snapshot
     print(f"{YELLOW}Radon v{VERSION_RADON}{RESET}")
     print("")
-    print(f"{CYAN}Current Directory | {" | ".join(cwd_list)}{RESET}")
+    print(f"{CYAN}Current Directory | {' | '.join(cwd_list)}{RESET}")
     print("")
 
     init()
