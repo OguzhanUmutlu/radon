@@ -1588,7 +1588,8 @@ class Transpiler:
                     found_fn = f
                     break
         if found_fn is None:
-            raise_syntax_error(f"Invalid arguments. Available usages:\n{'\n'.join(available)}", base)
+            available_str = "\n".join(available)
+            raise_syntax_error(f"Invalid arguments. Available usages:\n{available_str}", base)
             assert False
 
         returns = found_fn.returns

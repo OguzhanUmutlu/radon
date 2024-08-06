@@ -15,7 +15,7 @@ def _lib_print(ctx: TranspilerContext, args: List[Cpl], token, prefix: str, name
     if len(args) == 2:
         ctx.file.append(f"{prefix} {args[1].tellraw_object_str(ctx)}")
     else:
-        ctx.file.append(f"{prefix} [{", ".join(x.tellraw_object_str(ctx) for x in args[1:])}]")
+        ctx.file.append(f"{prefix} [{', '.join(x.tellraw_object_str(ctx) for x in args[1:])}]")
     return CplInt(token, 0)
 
 
