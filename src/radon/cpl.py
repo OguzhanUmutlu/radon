@@ -60,7 +60,7 @@ class Cpl:
                 t1 = t2
                 t2 = self.token
             raise_syntax_error_t(
-                f"Cannot compute {self.type}({self.unique_type}) {op} {cpl.c}({cpl.unique_type})",
+                f"Cannot compute {self.type}({self.unique_type}) {op} {cpl.type}({cpl.unique_type})",
                 t1.code, t1.start, t2.end)
             assert False
 
@@ -1826,5 +1826,13 @@ class CplTuple(Cpl):
     def tellraw_object(self, ctx):
         return {"text": json.dumps(self._py_val)}
 
+# noinspection PyTypeChecker
+make_num(CplInt)
+# noinspection PyTypeChecker
+make_num(CplFloat)
+# noinspection PyTypeChecker
+make_nbt_num(CplIntNBT)
+# noinspection PyTypeChecker
+make_nbt_num(CplFloatNBT)
 
 from .transpiler import TranspilerContext, raw_group_args
