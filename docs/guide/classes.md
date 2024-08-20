@@ -46,7 +46,7 @@ class MyClass {
   }
 }
 
-myClass = MyClass()
+myClass = MyClass(10)
 myClass.increaseMyAttribute()
 print(myClass.myAttribute)
 ```
