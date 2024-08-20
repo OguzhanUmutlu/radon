@@ -1117,6 +1117,7 @@ class CplStringNBT(CplNBT):
             ctx.file.append(f"data modify {res.location} set string {self.location} {arg0.value} {arg1.value}")
             return res
         if index == "toLowerCase" or index == "toUpperCase":
+            raise_syntax_error("Not implemented", self.token)
             if len(arguments) != 0:
                 return 0
             ind_name = "lower" if index == "toLowerCase" else "upper"
@@ -1128,9 +1129,11 @@ class CplStringNBT(CplNBT):
             if f"__lib__/str_to_{ind_name}" not in ctx.transpiler.files:
                 fil = []
                 ctx.transpiler.files[f"__lib__/str_to_{ind_name}"] = fil
+            ctx.file.append(f"function __lib__/str_to_{ind_name}")
 
             return self
         if index == "replace" or index == "replaceAll":
+            raise_syntax_error("Not implemented", self.token)
             if len(arguments) != 2:
                 return 2
             arg0 = arguments[0]
@@ -1143,6 +1146,7 @@ class CplStringNBT(CplNBT):
                 arg1 = arg1.cache(ctx)
             return None
         if index == "split":
+            raise_syntax_error("Not implemented", self.token)
             if len(arguments) != 1:
                 return 1
             arg0 = arguments[0]
@@ -1825,6 +1829,7 @@ class CplTuple(Cpl):
 
     def tellraw_object(self, ctx):
         return {"text": json.dumps(self._py_val)}
+
 
 # noinspection PyTypeChecker
 make_num(CplInt)

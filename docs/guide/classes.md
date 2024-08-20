@@ -30,11 +30,16 @@ print(myClass.myAttribute)
 
 ***
 
-You can access of the class inside a class method by using the `this` variable like this:
+You can access of the class inside a class method by using the `this` and even change the
+constructor function like this:
 
 ```js
 class MyClass {
   myAttribute = 1
+  
+  MyClass(int myAttribute) {
+    this.myAttribute = myAttribute
+  }
   
   increaseMyAttribute() {
     this.myAttribute++
