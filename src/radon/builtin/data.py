@@ -101,7 +101,7 @@ def lib_mset(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
 def lib_mstr(ctx: TranspilerContext, args: List[GroupToken], token: GroupToken):
     if len(args) != 1:
         raise_syntax_error(f"Expected 1 argument for mstr()", token)
-    nbt_loc = f"temp _{get_uuid()}"
+    nbt_loc = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
     cmd = f'data modify {nbt_loc} set value "{args[0].value}"'
     ctx.transpiler.run_cmd(ctx, Token(cmd, TokenType.POINTER, 0, len(cmd)))
     return CplStringNBT(token, nbt_loc)

@@ -121,7 +121,7 @@ class Cpl:
         nbt_got_id = None
         if not nbt_loc and force != "score":
             nbt_got_id = get_uuid()
-            nbt_loc = f"storage temp _{nbt_got_id}"
+            nbt_loc = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{nbt_got_id}"
         if not score_loc and force != "nbt":
             t = force_t or self.unique_type.type
             score_loc = f"{t}_{nbt_got_id or get_uuid()} __temp__"
@@ -830,7 +830,7 @@ class CplNBT(Cpl):
         if force == "score":
             return None
         if not nbt_loc:
-            nbt_loc = f"storage temp _{get_uuid()}"
+            nbt_loc = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
         ctx.file.append(f"data modify {nbt_loc} set from {self.location}")
         return val_nbt(self.token, nbt_loc, self.unique_type)
 
@@ -926,7 +926,7 @@ class CplArrayNBT(CplNBT):
         if index == "pop":
             if len(arguments) != 0:
                 raise_syntax_error("Expected 0 arguments for <array>.pop()", self.token)
-            eid = f"storage temp _{get_uuid()}"
+            eid = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
             ctx.file.append(f"data modify {eid} set from {self.location}[-1]")
             ctx.file.append(f"data remove {self.location}[-1]")
             return val_nbt(self.token, eid, self.unique_type.content)
@@ -1084,21 +1084,21 @@ class CplStringNBT(CplNBT):
             ctx.file.append(f"execute store result score {eid} run data get {self.location}")
             return CplScore(self.token, eid)
         if isinstance(index, CplInt):
-            temp = f"storage temp _{get_uuid()}"
+            temp = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
             ctx.file.append(f"data modify {temp} set string {self.location} {index.value} {index.value + 1}")
             return CplStringNBT(self.token, temp)
         if isinstance(index, CplScore) and index.unique_type.type == "int":
             index = index.cache(ctx, force="nbt")
         if isinstance(index, CplIntNBT):
-            index.cache(ctx, nbt_loc="storage temp __get_str_index__ _0", force="nbt")
+            index.cache(ctx, nbt_loc=f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__ _0", force="nbt")
             index.cache(ctx, force="score")._set_add(ctx, CplInt(self.token, 1)).cache(
-                ctx, nbt_loc="storage temp __get_str_index__ _1", force="nbt")
+                ctx, nbt_loc=f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__ _1", force="nbt")
             fn_name = f"__lib__/get_str_index/{get_uuid()}"
-            ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{fn_name} with storage temp __get_str_index__")
+            ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{fn_name} with storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__")
             ctx.transpiler.files[fn_name] = [
-                f"$data modify storage temp __get_str_index__result set string {self.location} $(_0) $(_1)"
+                f"$data modify storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__result set string {self.location} $(_0) $(_1)"
             ]
-            return CplStringNBT(self.token, "storage temp __get_str_index__result")
+            return CplStringNBT(self.token, f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__result")
         return None
 
     def _call_index(self, ctx, index, arguments, token):
@@ -1113,7 +1113,7 @@ class CplStringNBT(CplNBT):
             arg1 = arguments[1]
             if not isinstance(arg0, CplInt) or not isinstance(arg1, CplInt):
                 raise_syntax_error("Not implemented", token)
-            res = CplStringNBT(self.token, f"storage temp _{get_uuid()}")
+            res = CplStringNBT(self.token, f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}")
             ctx.file.append(f"data modify {res.location} set string {self.location} {arg0.value} {arg1.value}")
             return res
         if index == "toLowerCase" or index == "toUpperCase":
@@ -1175,14 +1175,14 @@ class CplStringNBT(CplNBT):
 
     def _add(self, ctx, cpl):
         if isinstance(cpl, CplString):
-            eid = f"storage temp _{get_uuid()}"
+            eid = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
             file_name = ctx.transpiler.get_temp_file_name(
                 f"$data modify {eid} set value '$(_0){cpl.value}'")
             self.cache(ctx, nbt_loc="string_concat _0", force="nbt")
             ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{file_name} with storage string_concat")
             return CplStringNBT(self.token, eid)
         if not isinstance(cpl, CplStringNBT):
-            eid = f"storage temp _{get_uuid()}"
+            eid = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
             file_name = ctx.transpiler.get_temp_file_name(
                 f"$data modify {eid} set value '$(_0)$(_1)'")
             self.cache(ctx, nbt_loc="string_concat _0", force="nbt")
@@ -1614,7 +1614,7 @@ class CplScore(Cpl):
             }
         eid = get_uuid()
         ctx.file.append(
-            f"execute store result storage temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
+            f"execute store result storage {ctx.transpiler.pack_namespace}:radon.temp _{eid} float {1 / FLOAT_PREC:.7f} run scoreboard players get {self.location}")
         return {
             "storage": "temp",
             "nbt": f"_{eid}"
@@ -1769,7 +1769,7 @@ class CplString(CplLiteral):
             return CplString(self.token, self.value + cpl.value)
         if not isinstance(cpl, CplStringNBT):
             return None
-        eid = f"storage temp _{get_uuid()}"
+        eid = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
         file_name = ctx.transpiler.get_temp_file_name(
             f"$data modify {eid} set value '{self.value}$(_0)'")
         cpl.cache(ctx, nbt_loc="string_concat _0", force="nbt")

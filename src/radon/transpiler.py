@@ -377,7 +377,7 @@ class Transpiler:
             self.files["tick"] = self.tick_file + self.files["tick"]
 
         if len(self.variables.keys()) > 0:
-            self.load_file.insert(0, 'scoreboard objectives add global dummy "global"')
+            self.load_file.insert(0, f'scoreboard objectives add {self.pack_namespace}.global dummy "{self.pack_namespace}:global"')
 
         # remove the lines after immediate returns
         for file in self.files:
@@ -766,7 +766,7 @@ class Transpiler:
                     ctx.file[-1] = ctx.file[-1][len(cl2):]
                 if len(ctx.file) > 1 and ret.location not in ctx.file[-1] and ctx.file[-2].startswith(cl1):
                     ctx.file.pop(-2)
-            if isinstance(ret, CplNBT) and ret.location.startswith("storage temp "):
+            if isinstance(ret, CplNBT) and ret.location.startswith(f"storage {self.pack_namespace}:radon.temp "):
                 # Cleaning the return results of the inline expression since they aren't going to be used
                 cl1 = f"data modify {ret.location} set from"
                 if len(ctx.file) > 0 and ctx.file[-1].startswith(cl1):
@@ -798,13 +798,13 @@ class Transpiler:
                     statement.returns[0],
                     ret,
                     score_loc=f"fn_return __temp__",
-                    nbt_loc=f"storage temp fn_return"
+                    nbt_loc=f"storage {self.pack_namespace}:radon.temp fn_return"
                 )
             if is_class_init:
                 if isinstance(statement.returns, list) and len(statement.returns) > 0:
                     raise_syntax_error("Class initializers cannot have return types", statement.returns[0])
                 cls = self.classes[fn_name]
-                ret_loc = CplObjectNBT(statement.name, f"storage variables this[-1]",
+                ret_loc = CplObjectNBT(statement.name, f"storage {self.pack_namespace}:variables this[-1]",
                                        cls.attributes.unique_type)
             count = 0
             new_functions = []
@@ -863,7 +863,7 @@ class Transpiler:
             )
             if is_class_init:
                 cls = self.classes[ctx.class_name]
-                fn_file.insert(0, f"data modify storage variables this append {cls.sample.get_data_str(ctx)}")
+                fn_file.insert(0, f"data modify storage {self.pack_namespace}:variables this append {cls.sample.get_data_str(ctx)}")
             if f.returns == "auto":
                 f.returns = "void"
             fn_file.insert(0, f"scoreboard players set __returned__ __temp__ 0")
@@ -910,7 +910,7 @@ class Transpiler:
                 f'scoreboard objectives add {name} dummy "{name}"'
             )
             self.load_file.append(
-                f"scoreboard players enable {name} global"
+                f"scoreboard players enable {name} {self.pack_namespace}.global"
             )
             return True
         if isinstance(statement, ExecuteMacroStatement):
@@ -922,13 +922,13 @@ class Transpiler:
                 self.files[fid] = [f"$execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}"]
                 for arg in ctx.function.arguments:
                     if arg.store_via == "macro":
-                        ctx.file.append("data modify storage temp _cmd_mem set value {}")
+                        ctx.file.append(f"data modify storage {self.pack_namespace}:radon.temp _cmd_mem set value " + "{}")
                         break
                 if mac:
                     for arg in ctx.function.arguments:
                         if arg.store_via == "macro":
-                            ctx.file.append(f"$data modify storage temp _cmd_mem.{arg.name} set value '$({arg.name})'")
-                ctx.file.append(f"function {self.pack_namespace}:{fid} with storage temp _cmd_mem")
+                            ctx.file.append(f"$data modify storage {self.pack_namespace}:radon.temp _cmd_mem.{arg.name} set value '$({arg.name})'")
+                ctx.file.append(f"function {self.pack_namespace}:{fid} with storage {self.pack_namespace}:radon.temp _cmd_mem")
             else:
                 ctx.file.append(
                     f"{'$' if mac else ''}execute {cmd_str} run function {self.pack_namespace}:{exec_name}{mac}")
@@ -1015,7 +1015,7 @@ class Transpiler:
                         arg[0][0],
                         CplDefArray(arg_type_parsed) if store_via in {"stack", "macro"} else arg_type_parsed,
                         score_loc="",
-                        nbt_loc=f"storage temp _fn_args.{get_uuid()}",
+                        nbt_loc=f"storage {self.pack_namespace}:radon.temp _fn_args.{get_uuid()}",
                         force_nbt=True
                     ),
                     store_via=store_via
@@ -1080,7 +1080,7 @@ class Transpiler:
                 if cmd[si + 1] == "(":
                     cmd_str += f"$(_{repl_i})"
                     val.cache(
-                        ctx, nbt_loc=f"storage temp _cmd_mem._{repl_i}", force="nbt"
+                        ctx, nbt_loc=f"storage {self.pack_namespace}:radon.temp _cmd_mem._{repl_i}", force="nbt"
                     )
 
                     has_repl = True
@@ -1108,7 +1108,7 @@ class Transpiler:
             cmd_str += cmd[i]
             i += 1
         if has_repl:
-            ctx.file.insert(before_index, "data modify storage temp _cmd_mem set value {}")
+            ctx.file.insert(before_index, f"data modify storage {self.pack_namespace}:radon.temp _cmd_mem set value " + "{}")
 
         return cmd_str, has_repl
 
@@ -1136,7 +1136,7 @@ class Transpiler:
         self.files[file_name] = cmd_file
         cmd_file.append("$return run " + cmd_str)
         file.append(
-            f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage temp _cmd_mem"
+            f"execute store {type} score {eid} run function {self.pack_namespace}:{file_name} with storage {self.pack_namespace}:radon.temp _cmd_mem"
         )
         return eid_val
 
@@ -1208,7 +1208,7 @@ class Transpiler:
                 if self.fn_exists(name):
                     return CplString(t, name, is_fn_reference=True)
                 if ctx.function and ctx.class_name is not None and name == "this":
-                    return CplObjectNBT(t, f"storage variables this[-1]",
+                    return CplObjectNBT(t, f"storage {self.pack_namespace}:variables this[-1]",
                                         self.classes[ctx.class_name].sample.unique_type)
                 if ctx.function:
                     fn = ctx.function
@@ -1234,8 +1234,8 @@ class Transpiler:
             return _type_to_cpl(
                 t,
                 var_type,
-                score_loc=f"{name} global",
-                nbt_loc=f"storage variables {name}",
+                score_loc=f"{name} {self.pack_namespace}.global",
+                nbt_loc=f"storage {self.pack_namespace}:variables {name}",
             )
         assert False
 
@@ -1465,7 +1465,7 @@ class Transpiler:
                 last_var_type = cpl
                 if front_type and front_type != cpl.unique_type:
                     if isinstance(front_type, CplDefArray) and isinstance(cpl, CplTuple) and len(cpl.value) == 0:
-                        last_var_type = _type_to_cpl(t0[0], front_type, "", f"storage variables {var_name}")
+                        last_var_type = _type_to_cpl(t0[0], front_type, "", f"storage {self.pack_namespace}:variables {var_name}")
                     else:
                         raise_syntax_error(f"Variable was defined as a {front_type} but got a {cpl.unique_type}", t0[0])
                 if isinstance(cpl, CplSelector):
@@ -1494,7 +1494,7 @@ class Transpiler:
                 if isinstance(variable_cpl, CplScore):
                     set_1 = f"scoreboard players set {variable_cpl.location} 1"
                 elif isinstance(variable_cpl, CplNBT):
-                    set_1 = f"data modify storage variables {variable_cpl.location} set value 1"
+                    set_1 = f"data modify storage {self.pack_namespace}:variables {variable_cpl.location} set value 1"
                 else:
                     raise ValueError("")
                 ctx.file.append(f"execute if entity {cpl.value} run {set_1}")
@@ -1612,7 +1612,7 @@ class Transpiler:
                 else:
                     ctx.file.append(f"data modify {store_at.location} append {val.get_data_str(ctx)}")
             elif arg.store_via == "macro":
-                val.cache(ctx, nbt_loc=f"storage temp _fn_args_macro.{found_fn.id}.{arg.name}", force="nbt")
+                val.cache(ctx, nbt_loc=f"storage {self.pack_namespace}:radon.temp _fn_args_macro.{found_fn.id}.{arg.name}", force="nbt")
                 has_any_macro_argument = True
             else:
                 store_at._set(ctx, val)
@@ -1630,7 +1630,7 @@ class Transpiler:
 
         if found_fn.type == "radon":
             ctx.file.append(f"function {self.pack_namespace}:{found_fn.file_name}" + (
-                f" with storage temp _fn_args_macro.{found_fn.id}" if has_any_macro_argument else ""
+                f" with storage {self.pack_namespace}:radon.temp _fn_args_macro.{found_fn.id}" if has_any_macro_argument else ""
             ))
             for index, arg in enumerate(fn_args):
                 if arg.store_via == "stack":
@@ -1665,9 +1665,9 @@ class Transpiler:
             class_name = name
 
         if class_name is not None and ctx.file is not self.main_file:
-            ctx.file.append(f"data modify storage temp class_this set from storage variables this[-1]")
-            ctx.file.append(f"data remove storage variables this[-1]")
-            actually_returning = CplObjectNBT(base, f"storage temp class_this",
+            ctx.file.append(f"data modify storage {self.pack_namespace}:radon.temp class_this set from storage {self.pack_namespace}:variables this[-1]")
+            ctx.file.append(f"data remove storage {self.pack_namespace}:variables this[-1]")
+            actually_returning = CplObjectNBT(base, f"storage {self.pack_namespace}:radon.temp class_this",
                                               self.classes[class_name].sample.unique_type)
 
         return actually_returning
