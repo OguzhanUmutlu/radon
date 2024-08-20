@@ -891,8 +891,8 @@ def object_get_index_nbt(ctx, content_type, cpl, index):
     eid = f"storage object_index _{get_uuid()}"
     file_name = ctx.transpiler.get_temp_file_name("$data modify {eid} set from $(_0).$(_1)")
 
-    cpl.cache(ctx, force="nbt", nbt_loc="object_get_index _0")
-    index.cache(ctx, force="nbt", nbt_loc="object_get_index _1")
+    cpl.cache(ctx, force="nbt", nbt_loc="storage object_get_index _0")
+    index.cache(ctx, force="nbt", nbt_loc="storage object_get_index _1")
     ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{file_name} with storage object_get_index")
     return val_nbt(cpl.token, eid, content_type)
 
