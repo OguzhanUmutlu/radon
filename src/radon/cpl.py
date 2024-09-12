@@ -10,6 +10,14 @@ from .utils import CplDef, get_uuid, FLOAT_PREC, basic_cmp, inv_cmp, CplDefArray
     CplDefObject, STRING_TYPE, SELECTOR_TYPE, CplDefTuple
 
 
+def can_convert_to_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 def tellraw_dumps(obj):
     if isinstance(obj, FunctionType):
         return obj()
@@ -915,7 +923,7 @@ class CplArrayNBT(CplNBT):
             return CplScore(self.token, eid)
         if isinstance(index, CplInt) or isinstance(index, CplString):
             ind = str(index.value)
-            if not ind.isnumeric():
+            if not can_convert_to_int(ind):
                 return None
             content = self.unique_type.content
             return val_nbt(self.token, self.location + "[" + ind + "]", content)
@@ -1090,15 +1098,18 @@ class CplStringNBT(CplNBT):
         if isinstance(index, CplScore) and index.unique_type.type == "int":
             index = index.cache(ctx, force="nbt")
         if isinstance(index, CplIntNBT):
-            index.cache(ctx, nbt_loc=f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__ _0", force="nbt")
+            index.cache(ctx, nbt_loc=f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__ _0",
+                        force="nbt")
             index.cache(ctx, force="score")._set_add(ctx, CplInt(self.token, 1)).cache(
                 ctx, nbt_loc=f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__ _1", force="nbt")
             fn_name = f"__lib__/get_str_index/{get_uuid()}"
-            ctx.file.append(f"function {ctx.transpiler.pack_namespace}:{fn_name} with storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__")
+            ctx.file.append(
+                f"function {ctx.transpiler.pack_namespace}:{fn_name} with storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__")
             ctx.transpiler.files[fn_name] = [
                 f"$data modify storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__result set string {self.location} $(_0) $(_1)"
             ]
-            return CplStringNBT(self.token, f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__result")
+            return CplStringNBT(self.token,
+                                f"storage {ctx.transpiler.pack_namespace}:radon.temp __get_str_index__result")
         return None
 
     def _call_index(self, ctx, index, arguments, token):
