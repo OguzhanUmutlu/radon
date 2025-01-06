@@ -932,11 +932,15 @@ class CplArrayNBT(CplNBT):
 
     def _call_index(self, ctx, index: str, arguments: List[Cpl], token):
         if index == "pop":
-            if len(arguments) != 0:
-                raise_syntax_error("Expected 0 arguments for <array>.pop()", self.token)
+            if len(arguments) > 1:
+                raise_syntax_error("Expected 0 or 1 argument for <array>.pop()", self.token)
             eid = f"storage {ctx.transpiler.pack_namespace}:radon.temp _{get_uuid()}"
-            ctx.file.append(f"data modify {eid} set from {self.location}[-1]")
-            ctx.file.append(f"data remove {self.location}[-1]")
+            ind = arguments[0] if len(arguments) == 1 else CplInt(self.token, -1)
+            if not isinstance(ind, CplInt):
+                raise_syntax_error("Expected an int argument for <array>.pop()", self.token)
+            ind = str(ind.value)
+            ctx.file.append(f"data modify {eid} set from {self.location}[{ind}]")
+            ctx.file.append(f"data remove {self.location}[{ind}]")
             return val_nbt(self.token, eid, self.unique_type.content)
         if index == "push":
             if len(arguments) == 0:

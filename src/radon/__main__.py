@@ -138,6 +138,9 @@ def build_dir():
 
     for out_folder in out_folders:
         bef = os.getcwd()
+        if not path.exists(out_folder):
+            print(f"Couldn't find the output folder: {out_folder}")
+            continue
         os.chdir(out_folder)
         if config["useLock"]:
             for f in rm_files:

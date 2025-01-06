@@ -29,7 +29,7 @@ EXECUTE_MACROS = [
     "on",
     "positioned",
     "rotated",
-    "summon",
+    # "summon", prevents the use of the actual summon command
     "if",
     "unless",
     "store",
