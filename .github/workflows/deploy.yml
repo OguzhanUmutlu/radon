@@ -34,10 +34,13 @@ jobs:
    - name: Build with VitePress
      run: npm run docs:build
      working-directory: ./docs
+   - name: List build output
+     run: ls -R docs/.vitepress/dist
    - name: Upload artifact
      uses: actions/upload-pages-artifact@v3
      with:
       path: docs/.vitepress/dist
+      name: github-pages
 
  deploy:
   environment:
